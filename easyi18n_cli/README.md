@@ -6,7 +6,7 @@ published version and writes them to disk, so you keep using stock Flutter
 localization (`flutter_localizations` + `gen-l10n` + `AppLocalizations`). No
 runtime dependency, no hot-update — _"we're your TMS"_.
 
-> For live hot-update (Mode B), use the [`easyi18n`](../easyi18n_flutter)
+> For live hot-update (Mode B), use the [`easyi18n`](../easyi18n)
 > runtime SDK instead. The two are independent; pick per project.
 
 ## Install
@@ -77,7 +77,7 @@ into `output/`, ready for `gen-l10n`.
 
 ## Push your source strings
 
-If your code calls `tr()` (via the [`easyi18n`](../easyi18n_flutter) runtime
+If your code calls `tr()` (via the [`easyi18n`](../easyi18n) runtime
 SDK), the CLI can register and translate those strings for you. It statically
 scans your source tree for `tr()` calls — both the canonical
 `context.tr('Welcome {name}')` and the `'Welcome {name}'.tr()` sugar — and
