@@ -8,8 +8,8 @@ app or CI; the easyi18n platform itself is a separate hosted service.
 
 | Package | pub.dev | What it does |
 | --- | --- | --- |
-| [`easyi18n`](easyi18n) | `easyi18n` | Runtime Flutter SDK — source-as-key `tr()`, an offline floor from baked assets, and live hot-updates from the delivery manifest/CDN. No codegen, no rebuild to change a value. |
-| [`easyi18n_cli`](easyi18n_cli) | `easyi18n_cli` | Command-line tool — **Mode A (native `.arb`)**. Pull translated files into your project and push your `tr()` source strings for translation. No runtime dependency. |
+| [`easyi18n`](packages/easyi18n) | `easyi18n` | Runtime Flutter SDK — source-as-key `tr()`, an offline floor from baked assets, and live hot-updates from the delivery manifest/CDN. No codegen, no rebuild to change a value. |
+| [`easyi18n_cli`](packages/easyi18n_cli) | `easyi18n_cli` | Command-line tool — **Mode A (native `.arb`)**. Pull translated files into your project and push your `tr()` source strings for translation. No runtime dependency. |
 
 > Pick the flow that fits: the **runtime SDK** (`easyi18n`) for hot-updating
 > strings, or the **CLI** (`easyi18n_cli`) to stay on stock
