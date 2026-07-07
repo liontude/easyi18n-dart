@@ -1,0 +1,22 @@
+name: easyi18n_example
+description: Minimal example wiring the easyi18n runtime SDK.
+publish_to: none
+version: 0.1.0
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  easyi18n:
+    path: ../
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  assets:
+    - assets/easyi18n/

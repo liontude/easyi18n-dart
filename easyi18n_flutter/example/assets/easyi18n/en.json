@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "locale": "en",
+  "bundleHash": "b2a59231b594af6c67c2cd309d91983c115949d0828e79a7783528de2157fdba",
+  "messages": {
+    "welcome": "Welcome to easyi18n",
+    "greeting": "Hello {name}",
+    "messages_count": "{count, plural, one{You have {count} message} other{You have {count} messages}}"
+  },
+  "tokenIndex": {
+    "072df46c24d91a999a0c606e5911f1fabc1534ff3693f7463df5cac1ba217806": "welcome",
+    "7f54077fa5d9ae6a1db8a96168ba64d6a87d2491a281e479a3b207573fb827b0": "greeting",
+    "ec3db4f3e4e30f47bbbfe7550c03eacbc93922275c2f65b6d9d08ccee47c016c": "messages_count"
+  }
+}

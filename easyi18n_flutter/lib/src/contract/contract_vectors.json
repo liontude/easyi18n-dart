@@ -1,0 +1,176 @@
+{
+  "messageTokenAlgo": "m1",
+  "bundleSchemaVersion": 1,
+  "tokens": [
+    {
+      "name": "text_simple",
+      "kind": "text",
+      "source": "Hello",
+      "ctx": null,
+      "canonical": "Hello",
+      "token": "9a6b2dc5b1e7ca1f4ab95ccdbe4d48c92aaeb157df53cac25ffba6b3d6d2ed05"
+    },
+    {
+      "name": "text_placeholder",
+      "kind": "text",
+      "source": "Welcome {name}",
+      "ctx": null,
+      "canonical": "Welcome {name}",
+      "token": "ddca8251638ef7fdf19f0735100e263d216a68becb43c4dc03c2523fdf7f1dd9"
+    },
+    {
+      "name": "text_apostrophe",
+      "kind": "text",
+      "source": "it's a test",
+      "ctx": null,
+      "canonical": "it's a test",
+      "token": "47f561ff7848465eefb207f0077b63d592d2c99a21fefd5a508d75a827e21a11"
+    },
+    {
+      "name": "text_literal_braces",
+      "kind": "text",
+      "source": "a {b} 100% c",
+      "ctx": null,
+      "canonical": "a {b} 100% c",
+      "token": "2106006df29f0b837d6db3125bacd5ae961f2a4893fc1a484abc1eaa0e13ca5c"
+    },
+    {
+      "name": "text_embedded_newline",
+      "kind": "text",
+      "source": "line1\nline2",
+      "ctx": null,
+      "canonical": "line1\nline2",
+      "token": "346843ca88d28891fdf8edd84dab6f701117a0f5c9c13f1d1866bbd91f6863cb"
+    },
+    {
+      "name": "text_ctx_verb",
+      "kind": "text",
+      "source": "Open",
+      "ctx": "verb",
+      "canonical": "Open",
+      "token": "7f2ca3f0f205f05c1a2aa410da78637f6680347d7ddd0690a960acfb399e9d60"
+    },
+    {
+      "name": "text_ctx_adjective",
+      "kind": "text",
+      "source": "Open",
+      "ctx": "adjective",
+      "canonical": "Open",
+      "token": "044c8a021c6d211232d12afac8f8108e18012f28bea8b26e02723e93a43d9d59"
+    },
+    {
+      "name": "text_empty_ctx",
+      "kind": "text",
+      "source": "Open",
+      "ctx": "",
+      "canonical": "Open",
+      "token": "501afbf92e9c47178045ccd410d86ada7c849b634fa5b7c163b52ab9c2889e29"
+    },
+    {
+      "name": "plural_basic",
+      "kind": "plural",
+      "source": {
+        "one": "cat",
+        "other": "cats"
+      },
+      "ctx": null,
+      "canonical": "{count, plural, one{cat} other{cats}}",
+      "token": "e532c45df9255ae7740da3a85d09f6a1e1923a46b99b0ebfbade5c06f7de2e08"
+    },
+    {
+      "name": "plural_with_literal_zero",
+      "kind": "plural",
+      "source": {
+        "=0": "no cats",
+        "one": "cat",
+        "other": "cats"
+      },
+      "ctx": null,
+      "canonical": "{count, plural, =0{no cats} one{cat} other{cats}}",
+      "token": "cdd61bf755714a4c838b836cdb151c13cc742f2e2bd697d92f92c61d0a403f7e"
+    },
+    {
+      "name": "plural_unknown_category",
+      "kind": "plural",
+      "source": {
+        "one": "cat",
+        "other": "cats",
+        "zzz": "fallback"
+      },
+      "ctx": null,
+      "canonical": "{count, plural, one{cat} other{cats} zzz{fallback}}",
+      "token": "99116872359ebdb0f2b8029b074c67cc56526bcfbdb01138288e06da88d6f721"
+    },
+    {
+      "name": "plural_body_needs_escaping",
+      "kind": "plural",
+      "source": {
+        "other": "a {x} b's }"
+      },
+      "ctx": null,
+      "canonical": "{count, plural, other{a '{'x'}' b''s '}'}}",
+      "token": "db20fd3d8d317f07f833c28ad13db387a5ddc2cc0ee4c686f2b14c0162ea6a70"
+    },
+    {
+      "name": "plural_full_cldr",
+      "kind": "plural",
+      "source": {
+        "zero": "z",
+        "few": "f",
+        "many": "m",
+        "two": "t",
+        "one": "o",
+        "other": "d"
+      },
+      "ctx": null,
+      "canonical": "{count, plural, zero{z} one{o} two{t} few{f} many{m} other{d}}",
+      "token": "404da274caabfcc11718e811f3fd987100352eccad3ad9cd7b49169ccc613a81"
+    },
+    {
+      "name": "plural_with_ctx",
+      "kind": "plural",
+      "source": {
+        "one": "cat",
+        "other": "cats"
+      },
+      "ctx": "noun",
+      "canonical": "{count, plural, one{cat} other{cats}}",
+      "token": "70eab317152b3c5a6f1a58a7ea66128d0af7dae51388518ecc07c86fe00dd3c4"
+    },
+    {
+      "name": "plural_literals_cldr_noncldr",
+      "kind": "plural",
+      "source": {
+        "other": "d",
+        "=2": "two-lit",
+        "zzz": "z-custom",
+        "one": "o",
+        "=0": "zero-lit",
+        "aaa": "a-custom"
+      },
+      "ctx": null,
+      "canonical": "{count, plural, =0{zero-lit} =2{two-lit} one{o} other{d} aaa{a-custom} zzz{z-custom}}",
+      "token": "10beb58779096f43a01ee78719c695cf3e4cdca3de457edf404fa8e5833a081b"
+    }
+  ],
+  "bundles": [
+    {
+      "locale": "es",
+      "messages": {
+        "welcome_name": "Hola {name}",
+        "cats_count": "{count, plural, one{gato} other{gatos}}"
+      },
+      "tokenIndex": {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "welcome_name",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "cats_count"
+      },
+      "bundleHash": "bedf6b27ed0ca1b4f6aa060d363b90c39bf4c02bd765126cc16bf98d00ebf58e"
+    },
+    {
+      "locale": "en",
+      "messages": {},
+      "tokenIndex": {},
+      "bundleHash": "85c7a117af266cead80d372bb39dcc67f64ecfc1c37828b4a40b1e810d03da6b"
+    }
+  ]
+}
