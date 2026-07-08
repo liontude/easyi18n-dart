@@ -49,7 +49,7 @@ Easyi18nController buildController() {
 }
 
 /// A bare `Localizations` (not `MaterialApp`) is enough for `context.tr`, which
-/// only reads the ambient locale — and it sidesteps MaterialApp's delegate-
+/// only reads the ambient locale - and it sidesteps MaterialApp's delegate-
 /// coverage warning for locales the default Material delegates don't ship.
 Widget appWith(Easyi18nController controller, Locale locale) => Easyi18nScope(
       projectId: 'p',

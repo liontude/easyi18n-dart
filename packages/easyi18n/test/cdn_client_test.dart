@@ -111,5 +111,38 @@ void main() {
         throwsA(isA<DeliveryException>()),
       );
     });
+
+    test('inner locale != requested locale → DeliveryException', () async {
+      // A self-consistent bundle that declares a different locale than the
+      // manifest pointed us at must be rejected (otherwise it drives a silent
+      // refetch loop and can smuggle an unsafe locale into the store).
+      final fr = Bundle.compute(
+        locale: 'fr',
+        messages: {'greeting': 'Bonjour'},
+        tokenIndex: {'tok': 'greeting'},
+      );
+      final client = CdnClient(MockClient(
+          (req) async => http.Response(jsonEncode(fr.toJson()), 200)));
+      expect(
+        client.fetchBundle(url, locale: 'es', expectedHash: fr.bundleHash),
+        throwsA(isA<DeliveryException>()),
+      );
+    });
+  });
+
+  group('response cap', () {
+    test('a declared oversize body is rejected without buffering', () async {
+      // MockClient.streaming lets the response lie about its size; the cap must
+      // reject on the declared Content-Length before reading the stream.
+      final client = CdnClient(MockClient.streaming((req, body) async {
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('{}')),
+          200,
+          contentLength: 64 * 1024 * 1024,
+        );
+      }));
+      expect(client.fetchManifest(manifestUrl),
+          throwsA(isA<DeliveryException>()));
+    });
   });
 }

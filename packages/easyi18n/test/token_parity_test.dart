@@ -7,14 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// The single most load-bearing invariant of the runtime: the SDK must compute
 /// the SAME `messageToken` for a source string as the backend did when it
-/// registered that source — otherwise every `tr()` lookup misses and the app
+/// registered that source, otherwise every `tr()` lookup misses and the app
 /// silently shows untranslated text.
 ///
 /// The backend tokenizes the source as **opaque text**
-/// (`message_tokens.dart`: `messageTokenForValue(TranslationText(unit.source))`),
-/// never parsing ICU. This test pins both halves:
-///   • POSITIVE — source-as-text reproduces the golden token byte-for-byte.
-///   • NEGATIVE — parsing an inline-ICU plural source produces a DIFFERENT
+/// (`messageTokenForValue(TranslationText(unit.source))`), never parsing ICU.
+/// This test pins both halves:
+///   - POSITIVE: source-as-text reproduces the golden token byte-for-byte.
+///   - NEGATIVE: parsing an inline-ICU plural source produces a DIFFERENT
 ///     token, documenting the trap an SDK author must NOT fall into.
 void main() {
   final vectors = jsonDecode(
@@ -39,14 +39,14 @@ void main() {
   group('negative: the inline-ICU plural trap', () {
     test('hashing the source AS TEXT differs from parsing it as a plural', () {
       // A dev writes a plural inline with a non-canonical variable name (`num`,
-      // not `count`) — the common case. Canonicalizing-as-plural would rename
+      // not `count`) - the common case. Canonicalizing-as-plural would rename
       // the variable and re-space the body, changing the bytes; hashing the raw
       // text (what the backend does) does NOT.
       const inline = '{num, plural, one{cat} other{cats}}';
 
       // The SDK (and backend) hash this as opaque text:
       final asText = messageTokenForValue(const TranslationText(inline));
-      // The WRONG thing — parsing into a TranslationPlural normalizes the var to
+      // The WRONG thing - parsing into a TranslationPlural normalizes the var to
       // `count` (see icu_canonical) → canonical "{count, plural, …}":
       final asPlural = messageTokenForValue(
         const TranslationPlural({'one': 'cat', 'other': 'cats'}),
@@ -65,7 +65,7 @@ void main() {
 
     test('a source written in exact canonical form coincides (harmless)', () {
       // If the dev happens to write the byte-exact canonical form, text- and
-      // plural-hashing coincide — a harmless coincidence, not a contradiction:
+      // plural-hashing coincide - a harmless coincidence, not a contradiction:
       // the SDK still hashes as text and still matches the backend.
       const canonical = '{count, plural, one{cat} other{cats}}';
       expect(

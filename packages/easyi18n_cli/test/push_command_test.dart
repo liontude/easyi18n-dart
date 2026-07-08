@@ -16,14 +16,14 @@ void main() {
   late Directory dir;
   late StringBuffer out;
   late StringBuffer err;
-  late Logger logger;
+  late CliLogger logger;
   late List<http.Request> requests;
 
   setUp(() {
     dir = Directory.systemTemp.createTempSync('easyi18n_cli_push');
     out = StringBuffer();
     err = StringBuffer();
-    logger = Logger(out: out, err: err);
+    logger = CliLogger(out: out, err: err);
     requests = [];
   });
   tearDown(() => dir.deleteSync(recursive: true));

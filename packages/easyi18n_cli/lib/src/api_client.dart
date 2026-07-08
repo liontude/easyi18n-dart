@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -141,12 +142,12 @@ class TranslationsApiClient {
 
     final http.Response response;
     try {
-      response = await _client.get(
-        uri,
-        headers: {
-          'authorization': 'Bearer $token',
-          'accept': 'application/json',
-        },
+      response = await _sendCapped(
+        http.Request('GET', uri)
+          ..headers.addAll({
+            'authorization': 'Bearer $token',
+            'accept': 'application/json',
+          }),
       );
     } on http.ClientException catch (e) {
       throw CliException('Could not reach $baseUrl: ${e.message}');
@@ -178,18 +179,18 @@ class TranslationsApiClient {
     );
   }
 
-  /// `GET /v1/projects/{id}/meta` — the project's currently published version
+  /// `GET /v1/projects/{id}/meta` - the project's currently published version
   /// (what `easyi18n status` compares the local state against).
   Future<ProjectMeta> fetchMeta({required String projectId}) async {
     final uri = Uri.parse('$baseUrl/v1/projects/$projectId/meta');
     final http.Response response;
     try {
-      response = await _client.get(
-        uri,
-        headers: {
-          'authorization': 'Bearer $token',
-          'accept': 'application/json',
-        },
+      response = await _sendCapped(
+        http.Request('GET', uri)
+          ..headers.addAll({
+            'authorization': 'Bearer $token',
+            'accept': 'application/json',
+          }),
       );
     } on http.ClientException catch (e) {
       throw CliException('Could not reach $baseUrl: ${e.message}');
@@ -209,7 +210,7 @@ class TranslationsApiClient {
     );
   }
 
-  /// `POST /v1/projects/{id}/translate` — register source units and (unless
+  /// `POST /v1/projects/{id}/translate` - register source units and (unless
   /// [dryRun]) trigger their translation. [dryRun] runs an estimate-only pass:
   /// no key is written, no job enqueued, nothing charged. [langs] optionally
   /// narrows to a subset of the project's target languages.
@@ -225,16 +226,16 @@ class TranslationsApiClient {
 
     final http.Response response;
     try {
-      response = await _client.post(
-        uri,
-        headers: {
-          'authorization': 'Bearer $token',
-          'content-type': 'application/json',
-        },
-        body: jsonEncode({
-          'units': [for (final u in units) u.toJson()],
-          if (langs != null && langs.isNotEmpty) 'langs': langs,
-        }),
+      response = await _sendCapped(
+        http.Request('POST', uri)
+          ..headers.addAll({
+            'authorization': 'Bearer $token',
+            'content-type': 'application/json',
+          })
+          ..body = jsonEncode({
+            'units': [for (final u in units) u.toJson()],
+            if (langs != null && langs.isNotEmpty) 'langs': langs,
+          }),
       );
     } on http.ClientException catch (e) {
       throw CliException('Could not reach $baseUrl: ${e.message}');
@@ -274,6 +275,41 @@ class TranslationsApiClient {
 
   void close() => _client.close();
 
+  /// Upper bound on any response body. A hostile or broken origin returning an
+  /// unbounded stream would otherwise OOM the process before it can be parsed.
+  static const int _maxResponseBytes = 64 * 1024 * 1024;
+
+  /// Sends [request] and reads at most [_maxResponseBytes], aborting a body
+  /// that declares or streams past the ceiling instead of buffering it whole.
+  Future<http.Response> _sendCapped(http.BaseRequest request) async {
+    final streamed = await _client.send(request);
+    final declared = streamed.contentLength;
+    if (declared != null && declared > _maxResponseBytes) {
+      // Rejecting before reading would leave the stream unlistened and leak the
+      // socket; cancel it explicitly.
+      await streamed.stream.listen(null).cancel();
+      throw CliException(
+        'Response from ${request.url.host} too large ($declared bytes).',
+      );
+    }
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in streamed.stream) {
+      builder.add(chunk);
+      if (builder.length > _maxResponseBytes) {
+        throw CliException(
+          'Response from ${request.url.host} exceeded $_maxResponseBytes bytes.',
+        );
+      }
+    }
+    return http.Response.bytes(
+      builder.takeBytes(),
+      streamed.statusCode,
+      headers: streamed.headers,
+      request: request,
+      reasonPhrase: streamed.reasonPhrase,
+    );
+  }
+
   String _describeError(http.Response response, {String action = 'Pull'}) {
     String? message;
     String? code;
@@ -288,7 +324,7 @@ class TranslationsApiClient {
     }
 
     final hint = switch (response.statusCode) {
-      401 => '\nCheck your token (EASYI18N_TOKEN) — it needs the right scope.',
+      401 => '\nCheck your token (EASYI18N_TOKEN) - it needs the right scope.',
       // 402 covers both out-of-credits and plan caps (e.g. the free-tier key
       // limit). Only the credits case warrants the top-up hint; for a plan
       // limit the server message already says what to do.

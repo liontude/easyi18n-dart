@@ -4,7 +4,7 @@ import 'dart:io';
 import 'exceptions.dart';
 import 'extract/source_unit.dart';
 
-/// One registered source in the lockfile — the (source, ctx) identity of a
+/// One registered source in the lockfile - the (source, ctx) identity of a
 /// managed key, mirroring [ExtractedUnit] without its source location.
 class LockUnit {
   LockUnit({required this.source, this.ctx});
@@ -26,10 +26,10 @@ class LockUnit {
 class LockfileDiff {
   LockfileDiff({required this.added, required this.removed});
 
-  /// Scanned units absent from the lockfile — new strings to register.
+  /// Scanned units absent from the lockfile - new strings to register.
   final List<ExtractedUnit> added;
 
-  /// Lockfile units absent from the scan — orphans (the string was removed or
+  /// Lockfile units absent from the scan - orphans (the string was removed or
   /// edited in code). Their translations are NOT deleted; this is informational
   /// unless `--prune` drops them from the lockfile.
   final List<LockUnit> removed;
@@ -39,8 +39,8 @@ class LockfileDiff {
   /// Unambiguous 1:1 renames (copy-edits): within a `ctx` bucket, exactly one
   /// added and one removed unit → the add carried over from the remove (an edit
   /// keeps the ctx, changes the source). Maps each such added unit's identity to
-  /// the previous `(source, ctx)`. Buckets with multiple adds/removes — notably
-  /// the common empty-ctx bucket with several edits — are left UNPAIRED: a
+  /// the previous `(source, ctx)`. Buckets with multiple adds/removes - notably
+  /// the common empty-ctx bucket with several edits - are left UNPAIRED: a
   /// mis-pair would link unrelated strings, so pairing is only done when it is
   /// unambiguous.
   Map<String, ({String source, String? ctx})> renamePairs() {
@@ -70,7 +70,7 @@ class LockfileDiff {
 /// The `easyi18n.lock` file: the set of `tr()` sources known to the backend
 /// after the last `push`/`extract`. Machine-managed (commit it); used to detect
 /// new strings to send and orphans removed from code. Identity is the raw
-/// (source, ctx) pair — the CLI never tokenizes (the backend does), so the lock
+/// (source, ctx) pair - the CLI never tokenizes (the backend does), so the lock
 /// stores sources verbatim.
 class Lockfile {
   Lockfile({required this.project, required List<LockUnit> units})
@@ -90,7 +90,7 @@ class Lockfile {
       );
 
   /// Loads [file], or returns an empty lockfile (for [project]) when it does not
-  /// exist yet — the first push starts from nothing. Throws [CliException] on a
+  /// exist yet - the first push starts from nothing. Throws [CliException] on a
   /// malformed file.
   factory Lockfile.loadOrEmpty(File file, {required String project}) {
     if (!file.existsSync()) return Lockfile(project: project, units: const []);

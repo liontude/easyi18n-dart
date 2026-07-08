@@ -5,7 +5,7 @@ import 'package:yaml/yaml.dart';
 import 'exceptions.dart';
 
 /// Project config read from `easyi18n.yaml` at the repo root. Holds everything
-/// `pull` needs except the credential — the token is never persisted to disk
+/// `pull` needs except the credential - the token is never persisted to disk
 /// (it comes from `EASYI18N_TOKEN` or `--token`).
 class Easyi18nConfig {
   Easyi18nConfig({
@@ -72,8 +72,8 @@ class Easyi18nConfig {
   /// (no token, stable key order) so generated configs stay reviewable.
   String toYaml() =>
       '''
-# easyi18n CLI config (Mode A — native .arb).
-# Docs: https://github.com/easyi18n/easyi18n-dart
+# easyi18n CLI config (Mode A, native .arb).
+# Docs: https://github.com/liontude/easyi18n-dart
 
 # The project to pull translations for.
 projectId: $projectId
@@ -97,6 +97,20 @@ output: $output
     );
   }
 
-  static String _normalizeBaseUrl(String raw) =>
-      raw.replaceAll(RegExp(r'/+$'), '');
+  static String _normalizeBaseUrl(String raw) {
+    final trimmed = raw.replaceAll(RegExp(r'/+$'), '');
+    final uri = Uri.tryParse(trimmed);
+    // Reject a scheme-less value like `localhost:8080` up front: it would
+    // otherwise crash later with a raw `ArgumentError: No host` instead of an
+    // actionable message (the config comment invites dropping the scheme).
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      throw CliException(
+        'baseUrl must be an absolute http(s) URL '
+        '(e.g. https://api.easyi18n.com); got "$raw".',
+      );
+    }
+    return trimmed;
+  }
 }

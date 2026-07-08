@@ -26,7 +26,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Easyi18nScope wraps MaterialApp — the only required argument is the
+    // Easyi18nScope wraps MaterialApp - the only required argument is the
     // project id. Baked floors live in assets/easyi18n/{locale}.json; the SDK
     // hot-updates them from the manifest with no extra code.
     return Easyi18nScope(

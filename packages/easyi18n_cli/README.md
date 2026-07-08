@@ -1,17 +1,17 @@
 # easyi18n_cli
 
-Command-line tool for [easyi18n](https://easyi18n.com) — **Mode A (native
+Command-line tool for [easyi18n](https://easyi18n.com). **Mode A (native
 `.arb`)**. It pulls the translated localization files from your project's
 published version and writes them to disk, so you keep using stock Flutter
 localization (`flutter_localizations` + `gen-l10n` + `AppLocalizations`). No
-runtime dependency, no hot-update — _"we're your TMS"_.
+runtime dependency, no hot-update. _"we're your TMS"_.
 
-> For live hot-update (Mode B), use the [`easyi18n`](../easyi18n)
+> For live hot-update (Mode B), use the [`easyi18n`](https://pub.dev/packages/easyi18n)
 > runtime SDK instead. The two are independent; pick per project.
 
 ## Install
 
-**Flutter project** — add as a dev dependency (it never ships in your app):
+**Flutter project**: add as a dev dependency (it never ships in your app):
 
 ```yaml
 dev_dependencies:
@@ -22,7 +22,7 @@ dev_dependencies:
 dart run easyi18n_cli:easyi18n pull
 ```
 
-**Non-Flutter / CI** — activate globally:
+**Non-Flutter / CI**: activate globally:
 
 ```sh
 dart pub global activate easyi18n_cli
@@ -77,10 +77,10 @@ into `output/`, ready for `gen-l10n`.
 
 ## Push your source strings
 
-If your code calls `tr()` (via the [`easyi18n`](../easyi18n) runtime
+If your code calls `tr()` (via the [`easyi18n`](https://pub.dev/packages/easyi18n) runtime
 SDK), the CLI can register and translate those strings for you. It statically
-scans your source tree for `tr()` calls — both the canonical
-`context.tr('Welcome {name}')` and the `'Welcome {name}'.tr()` sugar — and
+scans your source tree for `tr()` calls (both the canonical
+`context.tr('Welcome {name}')` and the `'Welcome {name}'.tr()` sugar) and
 sends the **raw source strings** to the backend, which tokenizes and translates
 them.
 
@@ -119,10 +119,10 @@ the CLI reports it so you know it relies on runtime auto-capture instead.
 
 `push` records the strings it registered in `easyi18n.lock` (commit it). On the
 next run, anything new is sent; strings that vanished from your code are
-reported as **orphans** (their translations are kept — pass `--prune` to drop
+reported as **orphans** (their translations are kept; pass `--prune` to drop
 them from the lockfile).
 
-### `extract` — inspect without pushing
+### `extract`: inspect without pushing
 
 ```sh
 dart run easyi18n_cli:easyi18n extract

@@ -9,11 +9,11 @@ import 'package:test/test.dart';
 
 void main() {
   late Directory dir;
-  late Logger logger;
+  late CliLogger logger;
 
   setUp(() {
     dir = Directory.systemTemp.createTempSync('easyi18n_cli_init');
-    logger = Logger(out: StringBuffer(), err: StringBuffer());
+    logger = CliLogger(out: StringBuffer(), err: StringBuffer());
   });
   tearDown(() => dir.deleteSync(recursive: true));
 

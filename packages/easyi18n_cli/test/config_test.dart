@@ -73,6 +73,13 @@ output: lib/i18n
         throwsA(isA<CliException>()),
       );
     });
+
+    test('throws on a scheme-less baseUrl instead of crashing later', () {
+      expect(
+        () => Easyi18nConfig.load(write('projectId: p\nbaseUrl: localhost:8080')),
+        throwsA(isA<CliException>()),
+      );
+    });
   });
 
   test('toYaml round-trips through load', () {

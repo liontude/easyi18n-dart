@@ -1,9 +1,16 @@
 name: easyi18n
 description: >-
-  Runtime SDK for easyi18n — resolve UI strings with source-as-key tr(), with an
+  Runtime SDK for easyi18n: resolve UI strings with source-as-key tr(), with an
   offline floor (baked assets) and live hot-update from a delivery manifest/CDN.
 version: 0.1.0
 repository: https://github.com/liontude/easyi18n-dart
+issue_tracker: https://github.com/liontude/easyi18n-dart/issues
+topics:
+  - i18n
+  - l10n
+  - translation
+  - flutter
+  - arb
 environment:
   sdk: ^3.9.0
   flutter: ">=3.24.0"

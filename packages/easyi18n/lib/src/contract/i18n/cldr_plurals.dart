@@ -1,11 +1,8 @@
-/// CLDR plural categories for a given language code (data-model §4.9
-/// plurals). Used by the UI plural editor and by formatters that emit
-/// language-specific plural blocks (ARB ICU, iOS `.stringsdict`, Android
-/// `<plurals>`).
+/// CLDR plural categories for a given language code.
 ///
 /// Source: Unicode CLDR plural rules v45 (matches Flutter's `intl` package).
-/// Only the language portion of the locale is consulted — `pt-BR` and
-/// `pt-PT` share categories with `pt`. Region-specific overrides post-v1.
+/// Only the language portion of the locale is consulted: `pt-BR` and `pt-PT`
+/// share categories with `pt`.
 library;
 
 /// CLDR plural categories. The set returned by [pluralFormsFor] is a subset
@@ -14,7 +11,7 @@ enum PluralCategory { zero, one, two, few, many, other }
 
 /// Returns the ordered set of plural categories that [langCode] uses.
 /// `other` is always present (every CLDR language has it). Order is
-/// canonical CLDR order — important for golden tests where the emitted
+/// canonical CLDR order - important for golden tests where the emitted
 /// `{count, plural, ...}` strings must be byte-stable.
 List<PluralCategory> pluralFormsFor(String langCode) {
   final lang = _baseLang(langCode);
@@ -179,8 +176,7 @@ const Map<String, List<PluralCategory>> _rules = {
 };
 
 extension PluralCategoryName on PluralCategory {
-  /// CLDR canonical lowercase name (`one`, `other`, `few`, …). Used by
-  /// formatters to emit the plural label.
+  /// CLDR canonical lowercase name (`one`, `other`, `few`, ...).
   String get cldrName => switch (this) {
     PluralCategory.zero => 'zero',
     PluralCategory.one => 'one',

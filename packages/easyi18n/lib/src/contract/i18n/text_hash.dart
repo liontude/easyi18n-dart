@@ -1,10 +1,10 @@
-/// String interning for the corpus pool (data-model §4.1).
+/// Content-only string hashing for source-as-key resolution.
 ///
 /// Every unique string (whether it originated as a key source or as a
-/// translation, in any language) is stored once in `strings/{hash}`. The hash
-/// is **content-only** — it does NOT include the language/baseCode — so the
-/// same text used as a source in one key and as a translation in another
-/// collapses to a single pool entry. A string is a string.
+/// translation, in any language) hashes to one value. The hash is
+/// **content-only**: it does NOT include the language/baseCode, so the same
+/// text used as a source in one key and as a translation in another collapses
+/// to a single identity. A string is a string.
 ///
 /// The same algorithm runs on the backend (when interning) and the client
 /// (for optimistic local resolution). Byte-exact agreement is what guarantees
@@ -19,7 +19,7 @@
 /// - `canonicalize`: Unicode NFC + normalize line endings to `\n` + trim outer
 ///   whitespace. No lowercase. Internal whitespace and placeholders are NOT
 ///   touched. The canonical form is what gets STORED (not the raw input), so
-///   `stored value == hashed value` — no "first writer wins" surprise.
+///   `stored value == hashed value` - no "first writer wins" surprise.
 /// - The `t|`/`p|` prefix keeps a one-form plural named `other` from colliding
 ///   with the equivalent non-plural string.
 /// - Plural maps are serialized with keys sorted lexicographically so
@@ -35,7 +35,7 @@ import '../models/translation_value.dart';
 import 'icu_canonical.dart';
 
 /// Hard cap on a single string value (source or translation), in characters.
-/// These are UI strings, not documents — long content is split across keys.
+/// These are UI strings, not documents - long content is split across keys.
 const int kMaxStringLength = 10000;
 
 /// Algorithm version baked into every [messageToken]. The version prefix lets a
@@ -81,7 +81,7 @@ String stringHash(TranslationValue value) => switch (value) {
   TranslationPlural(:final forms) => stringHashForPlural(forms),
 };
 
-/// The canonical form of a [TranslationValue] — i.e. the value that should be
+/// The canonical form of a [TranslationValue] - i.e. the value that should be
 /// STORED in the pool so it matches what [stringHash] hashed.
 TranslationValue canonicalizeValue(TranslationValue value) => switch (value) {
   TranslationText(:final text) => TranslationText(canonicalizeSource(text)),
@@ -90,8 +90,8 @@ TranslationValue canonicalizeValue(TranslationValue value) => switch (value) {
   }),
 };
 
-/// Runtime **message token** (identity concept #3) — the source-as-key address
-/// the SDK uses to resolve `tr(source) → token → slug → value`.
+/// Runtime **message token**: the source-as-key address the SDK uses to
+/// resolve `tr(source)` to a token, then to its translated value.
 ///
 /// `messageToken = sha256('<algo>|' + canonicalIcu + '\x1f' + ctx)` with
 /// [kMessageTokenAlgoVersion] as the version prefix and `\x1f` (unit separator)

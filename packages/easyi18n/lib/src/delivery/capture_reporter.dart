@@ -4,14 +4,14 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 /// Reports the `tr()` sources the runtime had to render raw (unknown to the
-/// project) to the backend capture endpoint, so they show up as draft keys —
+/// project) to the backend capture endpoint, so they show up as draft keys -
 /// the "install → tr() → run → it appears" loop, with no CLI.
 ///
 /// Debug-only by construction (the [Easyi18nScope] only builds one in debug,
-/// and only when a capture [token] is provided — that token is a `capture`-scope
+/// and only when a capture [token] is provided - that token is a `capture`-scope
 /// dev credential that must NEVER ship in a release build). Cheap on the hot
 /// path: each unique `(source, ctx)` is recorded once per session and flushed in
-/// a debounced batch. Best-effort — a failed POST is swallowed.
+/// a debounced batch. Best-effort - a failed POST is swallowed.
 class CaptureReporter {
   CaptureReporter({
     required this.endpoint,
@@ -72,7 +72,7 @@ class CaptureReporter {
     } catch (_) {
       // Best-effort, but don't lose the batch on a transient failure: re-queue
       // it and re-arm the timer so the next tick retries (the sources stay in
-      // `_seen`, so the backend — which dedups anyway — never sees duplicates).
+      // `_seen`, so the backend - which dedups anyway - never sees duplicates).
       if (!_disposed) {
         _pending.addAll(batch);
         _timer ??= Timer(flushInterval, () => unawaited(flush()));

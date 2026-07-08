@@ -1,12 +1,10 @@
 import 'dart:io';
 
 import 'package:args/command_runner.dart';
-import 'package:easyi18n_cli/src/command_runner.dart';
-import 'package:easyi18n_cli/src/exceptions.dart';
-import 'package:easyi18n_cli/src/logger.dart';
+import 'package:easyi18n_cli/easyi18n_cli.dart';
 
 Future<void> main(List<String> args) async {
-  final logger = Logger();
+  final logger = CliLogger();
   try {
     final code = await Easyi18nCommandRunner(logger: logger).run(args) ?? 0;
     exit(code);

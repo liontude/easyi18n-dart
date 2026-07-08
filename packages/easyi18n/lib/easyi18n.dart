@@ -1,4 +1,4 @@
-/// easyi18n — runtime SDK.
+/// easyi18n - runtime SDK.
 ///
 /// Wrap your `MaterialApp` with [Easyi18nScope] and translate with
 /// `context.tr('Welcome {name}', args: {'name': n})`. Strings resolve from an

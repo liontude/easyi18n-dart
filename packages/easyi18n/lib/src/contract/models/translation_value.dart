@@ -1,6 +1,6 @@
 /// Vendored, flat copy of the core `TranslationValue` (translation-API
 /// contract). The runtime SDK only needs the sealed type + `fromJson`/`toJson`,
-/// so this drops the freezed/json_serializable converter the backend uses —
+/// so this drops the freezed/json_serializable converter the backend uses -
 /// keeping it a plain, dependency-light value the vendored hashing files
 /// (`text_hash.dart`, `icu_canonical.dart`) can pattern-match on.
 ///
@@ -10,7 +10,7 @@ library;
 
 import 'package:meta/meta.dart';
 
-/// A translation payload — either a plain [TranslationText] for a non-plural
+/// A translation payload - either a plain [TranslationText] for a non-plural
 /// source, or a [TranslationPlural] map of CLDR plural categories to strings.
 @immutable
 sealed class TranslationValue {

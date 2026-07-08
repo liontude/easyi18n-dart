@@ -6,14 +6,14 @@ import 'bundle_stack.dart';
 
 /// Resolves `tr(source, {args})` against a [BundleStack].
 ///
-/// **Token parity (load-bearing):** the source is hashed as **opaque text** —
-/// `messageTokenForValue(TranslationText(source), ctx:)` — NEVER parsed as ICU.
-/// The backend tokenizes the same way (`message_tokens.dart`), so the bytes
-/// match. Parsing an inline-ICU plural source here would canonicalize it to
-/// `{count, plural, …}` and produce a DIFFERENT token, so every lookup would
-/// miss. The plural still renders because the localized ICU lives in the
-/// bundle message (`messages[slug]`) and [MessageFormat] resolves it; the raw
-/// source is both the token preimage and the offline fallback.
+/// **Token parity (load-bearing):** the source is hashed as **opaque text**,
+/// via `messageTokenForValue(TranslationText(source), ctx:)`, and NEVER parsed
+/// as ICU. The backend tokenizes the same way, so the bytes match. Parsing an
+/// inline-ICU plural source here would canonicalize it to `{count, plural, ...}`
+/// and produce a DIFFERENT token, so every lookup would miss. The plural still
+/// renders because the localized ICU lives in the bundle message
+/// (`messages[slug]`) and [MessageFormat] resolves it; the raw source is both
+/// the token preimage and the offline fallback.
 class MessageResolver {
   const MessageResolver();
 

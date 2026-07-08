@@ -99,12 +99,12 @@ class _TrVisitor extends RecursiveAstVisitor<void> {
 
     // Is this one of OUR tr() shapes? Parsing is syntax-only (no type
     // resolution), so gate on the conventional BuildContext receivers to avoid
-    // capturing — and billing — unrelated methods named `tr` (e.g.
+    // capturing - and billing - unrelated methods named `tr` (e.g.
     // `table.tr('<td>html</td>')`, `items.tr(...)`):
     //   'literal'.tr(...)               → receiver is a StringLiteral (sugar)
     //   tr('x') / context.tr('x')       → no receiver, or a context-like one
     // An arbitrary `<expr>.tr('literal')` is rejected (the runtime auto-capture
-    // still catches a genuine i18n call we skip here — false negatives are free,
+    // still catches a genuine i18n call we skip here - false negatives are free,
     // false positives cost a translation).
     const contextNames = {'context', 'ctx', 'c'};
     final isSugar = target is StringLiteral;
@@ -125,7 +125,7 @@ class _TrVisitor extends RecursiveAstVisitor<void> {
     } else if (positional.isNotEmpty) {
       sourceExpr = positional.first.argumentExpression;
     } else {
-      return; // a bare `.tr()` with no string — not one of our call shapes.
+      return; // a bare `.tr()` with no string - not one of our call shapes.
     }
 
     final value = sourceExpr is StringLiteral ? sourceExpr.stringValue : null;

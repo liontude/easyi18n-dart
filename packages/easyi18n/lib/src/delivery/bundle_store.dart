@@ -67,7 +67,7 @@ class LazyBundleStore implements BundleStore {
 }
 
 /// In-memory store: the always-available fallback (used on platforms without a
-/// filesystem, and in tests). Persists nothing across launches — the baked
+/// filesystem, and in tests). Persists nothing across launches - the baked
 /// asset floor covers cold starts there.
 class InMemoryBundleStore implements BundleStore {
   final Map<String, DeliveryState> _state = {};

@@ -10,11 +10,11 @@ import '../logger.dart';
 /// (e.g. non-interactive). Injectable so tests never touch the real terminal.
 typedef Prompt = String? Function(String label);
 
-/// `easyi18n init` — writes an `easyi18n.yaml` for the current project. Values
+/// `easyi18n init` - writes an `easyi18n.yaml` for the current project. Values
 /// come from flags; missing ones are prompted interactively when attached to a
 /// terminal, otherwise they fall back to defaults (or fail for required ones).
 class InitCommand extends Command<int> {
-  InitCommand({required Logger logger, Prompt? prompt})
+  InitCommand({required CliLogger logger, Prompt? prompt})
     : _logger = logger,
       _prompt = prompt ?? _terminalPrompt {
     argParser
@@ -42,7 +42,7 @@ class InitCommand extends Command<int> {
       );
   }
 
-  final Logger _logger;
+  final CliLogger _logger;
   final Prompt _prompt;
 
   @override

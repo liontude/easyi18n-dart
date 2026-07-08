@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -33,21 +34,58 @@ class ManifestUpdated extends ManifestFetch {
   final String? etag;
 }
 
-/// Thin HTTP client for the delivery origin (CDN or backend-origin — the SDK is
+/// Thin HTTP client for the delivery origin (CDN or backend-origin - the SDK is
 /// agnostic, it only follows the URLs the manifest hands it). Injectable
 /// [http.Client] so tests run against a `MockClient`.
 class CdnClient {
   CdnClient(this._client);
   final http.Client _client;
 
+  /// Upper bound on a delivery response body. The origin is only as trusted as
+  /// the manifest author; an unbounded stream would otherwise OOM the client
+  /// before the bundle hash can even be checked.
+  static const int _maxResponseBytes = 32 * 1024 * 1024;
+
+  /// GET [url] streaming into a buffer, aborting a body that declares or grows
+  /// past [_maxResponseBytes] instead of reading it whole.
+  Future<http.Response> _getCapped(Uri url,
+      {Map<String, String>? headers}) async {
+    final request = http.Request('GET', url);
+    if (headers != null) request.headers.addAll(headers);
+    final streamed = await _client.send(request);
+    final declared = streamed.contentLength;
+    if (declared != null && declared > _maxResponseBytes) {
+      // Rejecting before reading would otherwise leave the response stream
+      // unlistened and leak the socket; cancel it explicitly.
+      await streamed.stream.listen(null).cancel();
+      throw DeliveryException('response too large ($declared bytes)');
+    }
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in streamed.stream) {
+      builder.add(chunk);
+      if (builder.length > _maxResponseBytes) {
+        throw DeliveryException('response exceeded $_maxResponseBytes bytes');
+      }
+    }
+    return http.Response.bytes(
+      builder.takeBytes(),
+      streamed.statusCode,
+      headers: streamed.headers,
+      request: request,
+      reasonPhrase: streamed.reasonPhrase,
+    );
+  }
+
   /// Conditional GET of the manifest. Sends `If-None-Match: <etag>` when known
   /// so an unchanged manifest costs a cheap 304.
   Future<ManifestFetch> fetchManifest(Uri url, {String? etag}) async {
     final http.Response res;
     try {
-      res = await _client.get(url, headers: {
+      res = await _getCapped(url, headers: {
         'if-none-match': ?etag,
       });
+    } on DeliveryException {
+      rethrow;
     } catch (e) {
       throw DeliveryException('manifest fetch failed: $e');
     }
@@ -81,7 +119,9 @@ class CdnClient {
   }) async {
     final http.Response res;
     try {
-      res = await _client.get(url);
+      res = await _getCapped(url);
+    } on DeliveryException {
+      rethrow;
     } catch (e) {
       throw DeliveryException('bundle fetch failed: $e');
     }
@@ -94,6 +134,15 @@ class CdnClient {
           jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>);
     } catch (e) {
       throw DeliveryException('bundle parse failed: $e');
+    }
+    // The bundle's own locale is folded into its content hash, so a
+    // self-consistent bundle can still declare a locale other than the one the
+    // manifest pointed us at. Reject the mismatch here: otherwise the store
+    // keys the file by the wrong (or unsafe) locale while delivery records the
+    // hash under the requested one, forcing a silent refetch on every refresh.
+    if (bundle.locale != locale) {
+      throw DeliveryException(
+          'bundle locale "${bundle.locale}" != requested "$locale"');
     }
     if (bundle.schemaVersion > kBundleSchemaVersion) {
       throw DeliveryException(

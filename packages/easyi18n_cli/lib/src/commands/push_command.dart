@@ -11,6 +11,7 @@ import '../extract/source_unit.dart';
 import '../extract/tr_extractor.dart';
 import '../lockfile.dart';
 import '../logger.dart';
+import '../security.dart';
 
 /// Builds the API client `push` talks to. Injected so tests can swap in a
 /// `MockClient`-backed instance.
@@ -27,13 +28,13 @@ typedef Confirm = bool Function(String prompt);
 /// The most units one translate request accepts (matches the backend cap).
 const int _maxUnitsPerBatch = 500;
 
-/// `easyi18n push` — statically extract `tr()` sources from the source tree,
+/// `easyi18n push` - statically extract `tr()` sources from the source tree,
 /// diff them against the lockfile, then register and translate them via the
 /// authenticated backend. Interactive by default with a cost preview; `--yes`
 /// for CI, `--dry-run` to only estimate, `--max-credits` to cap the spend.
 class PushCommand extends Command<int> {
   PushCommand({
-    required Logger logger,
+    required CliLogger logger,
     ApiClientFactory? apiClientFactory,
     TrExtractor? extractor,
     Map<String, String>? environment,
@@ -85,7 +86,7 @@ class PushCommand extends Command<int> {
       );
   }
 
-  final Logger _logger;
+  final CliLogger _logger;
   final ApiClientFactory _apiClientFactory;
   final TrExtractor _extractor;
   final Map<String, String> _environment;
@@ -142,6 +143,8 @@ class PushCommand extends Command<int> {
       );
     }
 
+    warnOnUntrustedTarget(config.baseUrl, _logger);
+
     final client = _apiClientFactory(baseUrl: config.baseUrl, token: token);
     // Carry over unambiguous 1:1 copy-edits so the backend keeps the existing
     // key (cheap outdated cascade) instead of orphaning it and minting a new one.
@@ -193,7 +196,7 @@ class PushCommand extends Command<int> {
       }
 
       if (dryRun) {
-        _logger.info('Dry run — nothing registered or translated.');
+        _logger.info('Dry run - nothing registered or translated.');
         return preview.affordable ? 0 : 1;
       }
 

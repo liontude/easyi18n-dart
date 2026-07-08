@@ -60,6 +60,45 @@ void main() {
       final reopened = await FileBundleStore(dir).loadBundle('fr', bundle.bundleHash);
       expect(reopened!.messages['k'], 'v-fr');
     });
+
+    test('rejects a traversing locale (no write, no load)', () async {
+      final store = FileBundleStore(dir);
+      // A malicious manifest author can compute a valid hash for any locale,
+      // so the store itself must reject an unsafe path segment.
+      final evil = Bundle.compute(
+        locale: '../../pwned',
+        messages: {'k': 'v'},
+        tokenIndex: {'tok': 'k'},
+      );
+      await store.saveBundle(evil);
+      expect(Directory('${dir.path}/bundles').existsSync(), isFalse);
+      expect(await store.loadBundle('../../pwned', evil.bundleHash), isNull);
+    });
+
+    test('rejects a non-hex bundle hash on load', () async {
+      final store = FileBundleStore(dir);
+      expect(await store.loadBundle('es', '../../etc/passwd'), isNull);
+    });
+
+    test('rejects a traversing channel loudly (developer error)', () async {
+      final store = FileBundleStore(dir);
+      // channel is developer config, so an unsafe value throws rather than
+      // silently disabling persistence.
+      expect(
+        () => store.saveState('../../evil', const DeliveryState()),
+        throwsArgumentError,
+      );
+      expect(() => store.loadState('../../evil'), throwsArgumentError);
+      expect(dir.listSync(), isEmpty);
+    });
+
+    test('accepts an uppercase-hex bundle hash', () async {
+      final store = FileBundleStore(dir);
+      // A producer emitting uppercase hex must not be silently dropped.
+      final upper = 'A' * 64;
+      expect(await store.loadBundle('es', upper), isNull); // valid path, no file
+      expect(dir.listSync(), isEmpty);
+    });
   });
 
   group('InMemoryBundleStore', () {

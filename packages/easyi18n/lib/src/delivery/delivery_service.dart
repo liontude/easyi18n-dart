@@ -21,7 +21,7 @@ Uri buildCaptureUrl(Uri baseUrl, String projectId) {
 /// Orchestrates offline-first delivery: load the last-good persisted bundles at
 /// startup, then conditionally refresh against the manifest and download only
 /// the bundles whose content address changed. Throws nothing on a network/parse
-/// failure during [refresh] except a [DeliveryException] the caller swallows —
+/// failure during [refresh] except a [DeliveryException] the caller swallows -
 /// hot-update is best-effort, the floor always serves.
 class DeliveryService {
   DeliveryService({
@@ -71,7 +71,7 @@ class DeliveryService {
     final state = await store.loadState(channel);
     // Conditional fetch (cheap 304 when unchanged). If the manifest is
     // unchanged but a requested locale still has no persisted bundle (e.g. a
-    // prior bundle fetch failed), we have no URL for it — fall back to one
+    // prior bundle fetch failed), we have no URL for it - fall back to one
     // unconditional fetch to recover, instead of forcing a full body on every
     // startup just because a locale is missing.
     var fetch = await client.fetchManifest(

@@ -5,9 +5,9 @@ import 'package:easyi18n/src/resolver/bundle_stack.dart';
 import 'package:easyi18n/src/resolver/message_resolver.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The runtime must render the EXACT ICU shapes the backend serializer emits
-/// (`bundle_serializer.dart` → `renderIcuPlural`). These are the patterns that
-/// land in `bundle.messages`; `intl`'s [MessageFormat] resolves them at runtime.
+/// The runtime must render the EXACT ICU shapes the backend serializer emits.
+/// These are the patterns that land in `bundle.messages`; `intl`'s
+/// [MessageFormat] resolves them at runtime.
 void main() {
   const resolver = MessageResolver();
 
@@ -23,7 +23,7 @@ void main() {
   }
 
   test('plural selects the right form by count', () {
-    // The exact string bundle_serializer_test asserts for an en plural.
+    // The exact ICU string the backend emits for an en plural.
     const pattern = '{count, plural, one{{count} item} other{{count} items}}';
     final stack = stackFor('items', pattern);
 

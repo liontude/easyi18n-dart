@@ -9,12 +9,12 @@ import '../extract/tr_extractor.dart';
 import '../lockfile.dart';
 import '../logger.dart';
 
-/// `easyi18n extract` — statically scan the source tree for `tr()` calls and
+/// `easyi18n extract` - statically scan the source tree for `tr()` calls and
 /// print what would be registered, what's new, and what's orphaned versus the
 /// lockfile. Read-only and offline: it never writes the lockfile or contacts the
 /// backend (that's `push`). Useful as a CI drift check or before a push.
 class ExtractCommand extends Command<int> {
-  ExtractCommand({required Logger logger, TrExtractor? extractor})
+  ExtractCommand({required CliLogger logger, TrExtractor? extractor})
     : _logger = logger,
       _extractor = extractor ?? TrExtractor() {
     argParser
@@ -30,7 +30,7 @@ class ExtractCommand extends Command<int> {
       );
   }
 
-  final Logger _logger;
+  final CliLogger _logger;
   final TrExtractor _extractor;
 
   @override

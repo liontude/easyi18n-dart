@@ -80,6 +80,27 @@ void main() {
     expect(captured.url.queryParameters.containsKey('lang'), isFalse);
   });
 
+  test('rejects a declared-oversize response body', () async {
+    // MockClient.streaming lets the response lie about its size; the cap must
+    // reject on the declared Content-Length before buffering it.
+    final client = TranslationsApiClient(
+      baseUrl: 'https://api.easyi18n.com',
+      token: 'eik_secret',
+      httpClient: MockClient.streaming((req, body) async {
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('{}')),
+          200,
+          contentLength: 128 * 1024 * 1024,
+        );
+      }),
+    );
+
+    expect(
+      () => client.fetchTranslations(projectId: 'p', format: 'arb'),
+      throwsA(isA<CliException>()),
+    );
+  });
+
   test('surfaces the backend error message on 404', () async {
     final client = clientReturning(
       (req) => http.Response(

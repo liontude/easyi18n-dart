@@ -51,7 +51,7 @@ extension Easyi18nString on String {
   /// [BuildContext] to read the locale from, so pass [locale] explicitly; when
   /// omitted it defaults to the project's base locale (the ambient controller's
   /// first supported locale), NOT a hardcoded `en`. Prefer `context.tr` in
-  /// widgets — it follows the active UI locale and rebuilds on hot-swap.
+  /// widgets - it follows the active UI locale and rebuilds on hot-swap.
   String tr({
     String? ctx,
     Map<String, Object> args = const {},

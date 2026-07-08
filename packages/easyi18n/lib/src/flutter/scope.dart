@@ -26,7 +26,7 @@ const String kDefaultBaseUrl = 'https://api.easyi18n.com';
 /// resolves from the first frame) and kicks the offline-floor → persisted →
 /// hot-update load. Hot-update is automatic: a manifest swap notifies the
 /// controller, the [InheritedNotifier] rebuilds dependents, and `tr()` values
-/// refresh in place — no dev code.
+/// refresh in place - no dev code.
 class Easyi18nScope extends StatefulWidget {
   const Easyi18nScope({
     super.key,
@@ -58,7 +58,7 @@ class Easyi18nScope extends StatefulWidget {
 
   /// A `capture`-scope dev token that turns on auto-capture: in debug builds,
   /// sources rendered raw (unknown to the project) are registered as draft keys.
-  /// Read it from your dev environment (`--dart-define` / `.env`) — it must NOT
+  /// Read it from your dev environment (`--dart-define` / `.env`) - it must NOT
   /// ship in release. Null (the default) disables capture entirely.
   final String? captureToken;
 
@@ -134,7 +134,7 @@ class _Easyi18nScopeState extends State<Easyi18nScope> {
       final raw = await rootBundle.loadString(assetPath);
       return Bundle.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
-      return null; // no floor baked for this locale — fine.
+      return null; // no floor baked for this locale - fine.
     }
   }
 

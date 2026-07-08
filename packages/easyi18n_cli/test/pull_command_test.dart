@@ -15,13 +15,13 @@ void main() {
   late Directory dir;
   late StringBuffer out;
   late StringBuffer err;
-  late Logger logger;
+  late CliLogger logger;
 
   setUp(() {
     dir = Directory.systemTemp.createTempSync('easyi18n_cli_pull');
     out = StringBuffer();
     err = StringBuffer();
-    logger = Logger(out: out, err: err);
+    logger = CliLogger(out: out, err: err);
   });
   tearDown(() => dir.deleteSync(recursive: true));
 
@@ -191,5 +191,33 @@ void main() {
       ).run(['--config', writeConfig(), 'pull']),
       throwsA(isA<CliException>()),
     );
+  });
+
+  test('refuses a traversing file key (path traversal guard)', () async {
+    await expectLater(
+      runnerWith(
+        files: {'arb/../../../pwned.txt': 'x'},
+      ).run(['--config', writeConfig(), 'pull']),
+      throwsA(
+        isA<CliException>().having(
+          (e) => e.message,
+          'message',
+          contains('outside'),
+        ),
+      ),
+    );
+    expect(File('${dir.path}/../../../pwned.txt').existsSync(), isFalse);
+  });
+
+  test('refuses an absolute file key that escapes the output dir', () async {
+    // An absolute key makes p.join ignore outputDir; the guard must reject it.
+    final escaped = '${dir.path}/escaped.txt';
+    await expectLater(
+      runnerWith(
+        files: {escaped: 'x'},
+      ).run(['--config', writeConfig(), 'pull']),
+      throwsA(isA<CliException>()),
+    );
+    expect(File(escaped).existsSync(), isFalse);
   });
 }

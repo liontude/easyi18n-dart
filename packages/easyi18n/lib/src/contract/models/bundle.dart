@@ -1,6 +1,6 @@
 /// Vendored, flat copy of the core `Bundle` (translation-API contract). The
 /// runtime needs `fromJson`, the fields, and `computeBundleHash`/
-/// `canonicalJsonEncode` to verify a downloaded bundle's content address — but
+/// `canonicalJsonEncode` to verify a downloaded bundle's content address - but
 /// NOT freezed/json_serializable codegen (which would force `build_runner` on
 /// every consumer's `pub get`). The hashing logic is reproduced verbatim; the
 /// golden vectors (`contract_vectors.json`) gate byte-parity with the backend.

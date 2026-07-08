@@ -2,7 +2,7 @@
 
 Runtime SDK for [easyi18n](https://easyi18n.com). Translate UI strings with
 **source-as-key** `tr()`, ship an **offline floor**, and get **automatic
-hot-updates** from the delivery manifest — no code generation, no rebuild to
+hot-updates** from the delivery manifest: no code generation, no rebuild to
 change a translation's value.
 
 ```dart
@@ -18,7 +18,7 @@ dependencies:
 
 ## Quickstart
 
-Wrap your `MaterialApp` with `Easyi18nScope` — the only required argument is your
+Wrap your `MaterialApp` with `Easyi18nScope`. The only required argument is your
 project id:
 
 ```dart
@@ -47,7 +47,7 @@ Text(context.tr(
 ))
 ```
 
-The source string IS the key — there is no separate key catalog to maintain.
+The source string IS the key; there is no separate key catalog to maintain.
 Add a `ctx:` to disambiguate two identical strings with different meanings
 (`context.tr('Open', ctx: 'verb')`).
 
@@ -59,10 +59,10 @@ Add a `ctx:` to disambiguate two identical strings with different meanings
 For each `tr(source)` the SDK computes a `messageToken` over the source text and
 resolves it against a layered stack, newest first:
 
-1. **hot** — the latest bundle from a manifest swap (live),
-2. **persisted** — the last-good bundle from disk,
-3. **baked** — the offline floor shipped in your app,
-4. **raw source** — the base-language string itself (so the UI never shows a
+1. **hot**: the latest bundle from a manifest swap (live),
+2. **persisted**: the last-good bundle from disk,
+3. **baked**: the offline floor shipped in your app,
+4. **raw source**: the base-language string itself (so the UI never shows a
    blank or a key).
 
 The token is byte-identical to the one the backend stored, so lookups hit across
@@ -95,7 +95,7 @@ and rebuilding dependents. The check runs at startup by default.
 ## Auto-capture (debug)
 
 Pass a `capture`-scope dev token and, in **debug builds only**, any `tr()` source
-the project doesn't know yet is registered as a draft (`captured`) key — so it
+the project doesn't know yet is registered as a draft (`captured`) key, so it
 shows up in your dashboard to review and translate, with no CLI:
 
 ```dart
@@ -110,7 +110,7 @@ Easyi18nScope(
 flutter run --dart-define=EASYI18N_CAPTURE_TOKEN=eik_your_dev_token
 ```
 
-The token must **never ship in a release build** — the reporter is never
+The token must **never ship in a release build**: the reporter is never
 constructed in release, and is off entirely without a token. It is sent batched,
 best-effort, and only once per unique source per session. Captured keys are
 untranslated and never charge credits; translate them from the dashboard.

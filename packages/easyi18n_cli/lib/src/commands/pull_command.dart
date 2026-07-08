@@ -7,6 +7,7 @@ import '../api_client.dart';
 import '../config.dart';
 import '../exceptions.dart';
 import '../logger.dart';
+import '../security.dart';
 import '../state.dart';
 
 /// Builds the API client `pull` talks to. Injected so tests can swap in a
@@ -17,12 +18,12 @@ typedef ApiClientFactory =
       required String token,
     });
 
-/// `easyi18n pull` — downloads the translated files for the configured project
+/// `easyi18n pull` - downloads the translated files for the configured project
 /// from the authenticated backend and writes them to the output directory, so
-/// the dev can run `flutter gen-l10n` (Mode A — native .arb).
+/// the dev can run `flutter gen-l10n` (Mode A - native .arb).
 class PullCommand extends Command<int> {
   PullCommand({
-    required Logger logger,
+    required CliLogger logger,
     ApiClientFactory? apiClientFactory,
     Map<String, String>? environment,
   }) : _logger = logger,
@@ -47,7 +48,7 @@ class PullCommand extends Command<int> {
       );
   }
 
-  final Logger _logger;
+  final CliLogger _logger;
   final ApiClientFactory _apiClientFactory;
   final Map<String, String> _environment;
 
@@ -76,6 +77,8 @@ class PullCommand extends Command<int> {
         'Create an API key in your project settings (needs the read scope).',
       );
     }
+
+    warnOnUntrustedTarget(config.baseUrl, _logger);
 
     final client = _apiClientFactory(baseUrl: config.baseUrl, token: token);
     final PulledTranslations pulled;
@@ -107,7 +110,14 @@ class PullCommand extends Command<int> {
 
     for (final relPath in pulled.files.keys.toList()..sort()) {
       final stripped = _stripFormatPrefix(relPath, config.format);
-      final target = p.join(outputDir, stripped);
+      final target = p.normalize(p.join(outputDir, stripped));
+      // The file keys come from the backend; a traversing or absolute key
+      // (`../`, `/etc/...`) must never write outside the output directory.
+      if (!p.isWithin(outputDir, target)) {
+        throw CliException(
+          'Refusing to write "$relPath": resolves outside $outputDir.',
+        );
+      }
       if (dryRun) {
         _logger.detail(stripped);
         continue;

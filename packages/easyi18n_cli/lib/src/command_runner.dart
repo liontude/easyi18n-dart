@@ -10,13 +10,13 @@ import 'logger.dart';
 /// The `easyi18n` CLI. Wires up the commands and a global `--config` option so
 /// they share one config-path resolution.
 class Easyi18nCommandRunner extends CommandRunner<int> {
-  Easyi18nCommandRunner({Logger? logger})
+  Easyi18nCommandRunner({CliLogger? logger})
     : super(
         'easyi18n',
         'Manage easyi18n translations from your project: pull translated '
             'files (Mode A) and push tr() sources for translation.',
       ) {
-    final log = logger ?? Logger();
+    final log = logger ?? CliLogger();
     argParser.addOption(
       'config',
       help: 'Path to the config file.',

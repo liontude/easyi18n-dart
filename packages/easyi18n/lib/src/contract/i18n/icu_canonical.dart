@@ -1,9 +1,9 @@
-/// Canonical ICU serialization for the **message token** (`messageToken`, the
-/// runtime identity #3 in the translation-API contract). Frozen, normative,
-/// cross-SDK: a non-Dart SDK MUST reproduce these bytes exactly so the token it
-/// computes for a source matches the one the backend stored.
+/// Canonical ICU serialization for the **message token** (`messageToken`).
+/// Frozen, normative, cross-SDK: a non-Dart SDK MUST reproduce these bytes
+/// exactly so the token it computes for a source matches the one the backend
+/// stored.
 ///
-/// This is **written from scratch on purpose** — it does NOT reuse
+/// This is **written from scratch on purpose** - it does NOT reuse
 /// `renderIcuPlural` (which orders categories by language, mutates Markdown via
 /// `maybeMarkdown`, and does not escape literal `{`/`}`/`'`). None of those are
 /// acceptable in a contract that must be byte-stable forever and reproducible
@@ -16,10 +16,10 @@
 /// The renderable ICU that ships in bundles comes from the formatters, not from
 /// here.
 ///
-/// Normative rules (frozen — vectors in `test/i18n/contract_vectors.json` are
+/// Normative rules (frozen - the golden `contract_vectors.json` vectors are
 /// the source of truth):
 ///
-/// **Text path** (`TranslationText`): canonical = `canonicalizeSource(text)` —
+/// **Text path** (`TranslationText`): canonical = `canonicalizeSource(text)` -
 /// Unicode NFC, line endings normalized to `\n`, outer whitespace trimmed,
 /// internal whitespace and placeholders (`{name}`) preserved verbatim. No
 /// ICU re-quoting: the authored string is the contract.

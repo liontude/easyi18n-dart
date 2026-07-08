@@ -13,7 +13,7 @@ class ExtractedUnit {
   final String file;
   final int line;
 
-  /// Identity for diffing/dedup — a (source, ctx) pair. The length prefix makes
+  /// Identity for diffing/dedup - a (source, ctx) pair. The length prefix makes
   /// it injective (no separator can collide with content), so two units with
   /// equal identity map to one backend token / managed key.
   String get identity => '${source.length}:$source:${ctx ?? ''}';

@@ -6,16 +6,16 @@ import '../api_client.dart';
 import '../config.dart';
 import '../exceptions.dart';
 import '../logger.dart';
+import '../security.dart';
 import '../state.dart';
 import 'pull_command.dart' show ApiClientFactory;
 
-/// `easyi18n status` — compares the last pulled version (`.easyi18n/state.json`)
-/// against the server's current published version, so a dev can tell at a
-/// glance whether the files on disk are up to date
-/// (`publish-versioning.md` §4.5).
+/// `easyi18n status` compares the last pulled version
+/// (`.easyi18n/state.json`) against the server's current published version, so
+/// a dev can tell at a glance whether the files on disk are up to date.
 class StatusCommand extends Command<int> {
   StatusCommand({
-    required Logger logger,
+    required CliLogger logger,
     ApiClientFactory? apiClientFactory,
     Map<String, String>? environment,
   }) : _logger = logger,
@@ -29,7 +29,7 @@ class StatusCommand extends Command<int> {
     );
   }
 
-  final Logger _logger;
+  final CliLogger _logger;
   final ApiClientFactory _apiClientFactory;
   final Map<String, String> _environment;
 
@@ -56,6 +56,8 @@ class StatusCommand extends Command<int> {
         'Create an API key in your project settings (needs the read scope).',
       );
     }
+
+    warnOnUntrustedTarget(config.baseUrl, _logger);
 
     final client = _apiClientFactory(baseUrl: config.baseUrl, token: token);
     final ProjectMeta meta;
@@ -84,18 +86,18 @@ class StatusCommand extends Command<int> {
       _logger.info('Up to date.');
       return 0;
     }
-    _logger.info("Out of date${_behind(local, remote)} — run 'easyi18n pull'.");
+    _logger.info("Out of date${_behind(local, remote)} - run 'easyi18n pull'.");
     return 1;
   }
 
-  /// `" — N publishes behind"` when both versions parse and share the same
+  /// `" - N publishes behind"` when both versions parse and share the same
   /// day (the counter difference is exact there); empty otherwise.
   String _behind(String local, String remote) {
     final pl = parsePublishVersion(local);
     final pr = parsePublishVersion(remote);
     if (pl == null || pr == null || pl.date != pr.date) return '';
     final behind = pr.n - pl.n;
-    return ' — $behind publish${behind == 1 ? '' : 'es'} behind';
+    return ' - $behind publish${behind == 1 ? '' : 'es'} behind';
   }
 
   String _ago(DateTime t) {

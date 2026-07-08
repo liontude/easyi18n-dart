@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 /// Derived local state: what the last `pull` actually wrote to disk. Kept in
-/// `.easyi18n/state.json` next to the config — deliberately SEPARATE from
+/// `.easyi18n/state.json` next to the config - deliberately SEPARATE from
 /// `easyi18n.yaml` (the config is user intent, this is derived; add the
 /// `.easyi18n/` dir to your VCS ignore). Read by `easyi18n status` to compare
 /// against the server's current version.
@@ -24,7 +24,7 @@ class CliState {
     '${File(configPath).parent.path}${Platform.pathSeparator}$dirName${Platform.pathSeparator}$fileName',
   );
 
-  /// Loads the state, tolerating a missing or corrupt file (→ empty state —
+  /// Loads the state, tolerating a missing or corrupt file (→ empty state -
   /// it's a cache, never worth failing a command over).
   static CliState load(File file) {
     if (!file.existsSync()) return const CliState();
@@ -53,7 +53,7 @@ class CliState {
 }
 
 /// Parses a publish version id (`YYYY.MM.DD.N`, legacy `YYYY.MM.DD` = `.1`)
-/// into a comparable (date, n) pair, or null. Local mini-parser — the CLI is a
+/// into a comparable (date, n) pair, or null. Local mini-parser - the CLI is a
 /// standalone package and doesn't depend on `easyi18n_core`.
 ({int date, int n})? parsePublishVersion(String raw) {
   final m = RegExp(
