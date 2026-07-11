@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
 import 'exceptions.dart';
+import 'http_capped.dart';
 
 /// The rendered files for one pull: a map of relative path (as the backend
 /// namespaces it, e.g. `arb/app_en.arb`) to file content.
@@ -101,12 +101,42 @@ class TranslateResult {
       units.where((u) => u.needsTranslation).length;
 }
 
+/// The result of a publish or rollback (`201 {versionId, keyCount}`).
+class PublishOutcome {
+  PublishOutcome({
+    required this.versionId,
+    required this.keyCount,
+    this.restoredFrom,
+    this.icuRejected = const [],
+  });
+
+  final String versionId;
+  final int keyCount;
+
+  /// Rollback only: the version id whose snapshot was restored.
+  final String? restoredFrom;
+
+  /// `key [lang]: problem` per target cell the backend's ICU gate refused to
+  /// bake (it fell back to the incomplete mode instead). Surfaced so a CI log
+  /// names the offending cells.
+  final List<String> icuRejected;
+}
+
 /// The slice of `GET /v1/projects/{id}/meta` that `status` needs.
 class ProjectMeta {
   ProjectMeta({required this.currentVersionId, required this.baseCode});
 
   final String currentVersionId;
   final String baseCode;
+}
+
+/// The opaque ids a `workspace` + `project` handle ref resolves to, via
+/// `GET /v1/projects/resolve`.
+class ResolvedProjectRef {
+  ResolvedProjectRef({required this.projectId, required this.workspaceId});
+
+  final String projectId;
+  final String workspaceId;
 }
 
 /// Thin client over the authenticated public read endpoint
@@ -210,6 +240,49 @@ class TranslationsApiClient {
     );
   }
 
+  /// `GET /v1/projects/resolve?workspace=&project=` - maps the config's
+  /// `@handle/slug` ref to the opaque ids the id-bound write routes need. Any
+  /// valid key for the project is accepted (resolve underlies read, translate
+  /// and publish alike); a key bound to another project 401s, which surfaces
+  /// config<->key drift early.
+  Future<ResolvedProjectRef> resolveProjectRef({
+    required String workspace,
+    required String project,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/v1/projects/resolve',
+    ).replace(queryParameters: {'workspace': workspace, 'project': project});
+    final http.Response response;
+    try {
+      response = await _sendCapped(
+        http.Request('GET', uri)
+          ..headers.addAll({
+            'authorization': 'Bearer $token',
+            'accept': 'application/json',
+          }),
+      );
+    } on http.ClientException catch (e) {
+      throw CliException('Could not reach $baseUrl: ${e.message}');
+    }
+    if (response.statusCode != 200) {
+      throw CliException(_describeError(response, action: 'Resolve'));
+    }
+    final Map<String, dynamic> body;
+    try {
+      body = jsonDecode(response.body) as Map<String, dynamic>;
+    } on FormatException {
+      throw CliException('Unexpected response from $baseUrl (not JSON).');
+    }
+    final projectId = body['projectId'] as String? ?? '';
+    if (projectId.isEmpty) {
+      throw CliException('Unexpected response from $baseUrl (no projectId).');
+    }
+    return ResolvedProjectRef(
+      projectId: projectId,
+      workspaceId: body['workspaceId'] as String? ?? '',
+    );
+  }
+
   /// `POST /v1/projects/{id}/translate` - register source units and (unless
   /// [dryRun]) trigger their translation. [dryRun] runs an estimate-only pass:
   /// no key is written, no job enqueued, nothing charged. [langs] optionally
@@ -273,42 +346,73 @@ class TranslationsApiClient {
     );
   }
 
-  void close() => _client.close();
+  /// `POST /v1/projects/{id}/publish` - freeze the live state into a new
+  /// immutable version (needs the `publish` scope).
+  Future<PublishOutcome> publish({
+    required String projectId,
+    String? label,
+    bool approvedOnly = false,
+  }) => _post(
+    'projects/$projectId/publish',
+    action: 'Publish',
+    body: {
+      if (label != null && label.isNotEmpty) 'label': label,
+      if (approvedOnly) 'approvedOnly': true,
+    },
+  );
 
-  /// Upper bound on any response body. A hostile or broken origin returning an
-  /// unbounded stream would otherwise OOM the process before it can be parsed.
-  static const int _maxResponseBytes = 64 * 1024 * 1024;
+  /// `POST /v1/projects/{id}/versions/{vid}/restore` - roll back by restoring
+  /// [versionId] (or the literal `previous`) as a new version.
+  Future<PublishOutcome> restoreVersion({
+    required String projectId,
+    required String versionId,
+  }) => _post(
+    'projects/$projectId/versions/$versionId/restore',
+    action: 'Rollback',
+  );
 
-  /// Sends [request] and reads at most [_maxResponseBytes], aborting a body
-  /// that declares or streams past the ceiling instead of buffering it whole.
-  Future<http.Response> _sendCapped(http.BaseRequest request) async {
-    final streamed = await _client.send(request);
-    final declared = streamed.contentLength;
-    if (declared != null && declared > _maxResponseBytes) {
-      // Rejecting before reading would leave the stream unlistened and leak the
-      // socket; cancel it explicitly.
-      await streamed.stream.listen(null).cancel();
-      throw CliException(
-        'Response from ${request.url.host} too large ($declared bytes).',
+  Future<PublishOutcome> _post(
+    String path, {
+    required String action,
+    Map<String, Object?>? body,
+  }) async {
+    final http.Response response;
+    try {
+      response = await _sendCapped(
+        http.Request('POST', Uri.parse('$baseUrl/v1/$path'))
+          ..headers.addAll({
+            'authorization': 'Bearer $token',
+            'content-type': 'application/json',
+          })
+          ..body = jsonEncode(body ?? const {}),
       );
+    } on http.ClientException catch (e) {
+      throw CliException('Could not reach $baseUrl: ${e.message}');
     }
-    final builder = BytesBuilder(copy: false);
-    await for (final chunk in streamed.stream) {
-      builder.add(chunk);
-      if (builder.length > _maxResponseBytes) {
-        throw CliException(
-          'Response from ${request.url.host} exceeded $_maxResponseBytes bytes.',
-        );
-      }
+    if (response.statusCode != 201) {
+      throw CliException(_describeError(response, action: action));
     }
-    return http.Response.bytes(
-      builder.takeBytes(),
-      streamed.statusCode,
-      headers: streamed.headers,
-      request: request,
-      reasonPhrase: streamed.reasonPhrase,
+    final Map<String, dynamic> decoded;
+    try {
+      decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    } on FormatException {
+      throw CliException('Unexpected response from $baseUrl (not JSON).');
+    }
+    return PublishOutcome(
+      versionId: decoded['versionId'] as String? ?? '',
+      keyCount: (decoded['keyCount'] as num?)?.toInt() ?? 0,
+      restoredFrom: decoded['restoredFrom'] as String?,
+      icuRejected: [
+        for (final e in decoded['icuRejected'] as List? ?? const [])
+          if (e is String) e,
+      ],
     );
   }
+
+  void close() => _client.close();
+
+  Future<http.Response> _sendCapped(http.BaseRequest request) =>
+      sendCapped(_client, request);
 
   String _describeError(http.Response response, {String action = 'Pull'}) {
     String? message;
@@ -334,7 +438,16 @@ class TranslationsApiClient {
       403 =>
         '\nThe token is valid but lacks the required scope for this '
             'project.',
-      404 => '\nThe project may not exist or have no published version yet.',
+      404 when action == 'Resolve' =>
+        '\nCheck the workspace/project in easyi18n.yaml - is the handle '
+            'claimed and the slug correct?',
+      // The version_not_found message already says exactly what's missing
+      // (e.g. rollback with nothing older) - don't muddy it.
+      404 when code != 'version_not_found' =>
+        '\nThe project may not exist or have no published version yet.',
+      409 when code == 'export_collision' =>
+        '\nTwo keys collapse to the same name in a lossy format. Rename one '
+            'and re-publish, or pull a path-preserving format (e.g. json).',
       _ => '',
     };
     final detail = message ?? 'HTTP ${response.statusCode}';

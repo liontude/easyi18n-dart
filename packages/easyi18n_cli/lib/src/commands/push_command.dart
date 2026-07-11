@@ -11,6 +11,7 @@ import '../extract/source_unit.dart';
 import '../extract/tr_extractor.dart';
 import '../lockfile.dart';
 import '../logger.dart';
+import '../resolve.dart';
 import '../security.dart';
 
 /// Builds the API client `push` talks to. Injected so tests can swap in a
@@ -28,6 +29,12 @@ typedef Confirm = bool Function(String prompt);
 /// The most units one translate request accepts (matches the backend cap).
 const int _maxUnitsPerBatch = 500;
 
+/// `--publish` poll cadence + ceiling: how often the fill is re-checked and
+/// how long before giving up (the strings stay registered; publishing later
+/// loses nothing).
+const Duration _publishPollInterval = Duration(seconds: 5);
+const Duration _publishPollTimeout = Duration(minutes: 10);
+
 /// `easyi18n push` - statically extract `tr()` sources from the source tree,
 /// diff them against the lockfile, then register and translate them via the
 /// authenticated backend. Interactive by default with a cost preview; `--yes`
@@ -39,11 +46,13 @@ class PushCommand extends Command<int> {
     TrExtractor? extractor,
     Map<String, String>? environment,
     Confirm? confirm,
+    Future<void> Function(Duration)? wait,
   }) : _logger = logger,
        _apiClientFactory = apiClientFactory ?? _defaultFactory,
        _extractor = extractor ?? TrExtractor(),
        _environment = environment ?? Platform.environment,
-       _confirm = confirm ?? _stdinConfirm {
+       _confirm = confirm ?? _stdinConfirm,
+       _wait = wait ?? Future<void>.delayed {
     argParser
       ..addOption(
         'token',
@@ -83,6 +92,20 @@ class PushCommand extends Command<int> {
         help:
             'Drop orphaned strings from the lockfile (never deletes '
             'translations).',
+      )
+      ..addFlag(
+        'publish',
+        negatable: false,
+        help:
+            'After pushing, wait for the AI fill to complete and publish a '
+            'new version (needs the publish scope).',
+      )
+      ..addFlag(
+        'approved-only',
+        negatable: false,
+        help:
+            'With --publish: treat unapproved translations as missing when '
+            'publishing.',
       );
   }
 
@@ -91,6 +114,7 @@ class PushCommand extends Command<int> {
   final TrExtractor _extractor;
   final Map<String, String> _environment;
   final Confirm _confirm;
+  final Future<void> Function(Duration) _wait;
 
   static const String tokenEnvVar = 'EASYI18N_TOKEN';
 
@@ -114,6 +138,14 @@ class PushCommand extends Command<int> {
     final assumeYes = results['yes'] as bool;
     final langs = results['lang'] as List<String>;
     final maxCredits = _parseMaxCredits(results['max-credits'] as String?);
+    final publish = results['publish'] as bool;
+    final approvedOnly = results['approved-only'] as bool;
+    if (approvedOnly && !publish) {
+      throw CliException('--approved-only only makes sense with --publish.');
+    }
+    if (publish && dryRun) {
+      throw CliException('--publish cannot be combined with --dry-run.');
+    }
 
     // ---- 1. scan + diff (offline) ----
     final sourceDir = Directory(p.join(root, results['source-dir'] as String));
@@ -122,11 +154,13 @@ class PushCommand extends Command<int> {
       relativeTo: root,
     );
     final lockFile = File(p.join(root, Lockfile.fileName));
-    final lock = Lockfile.loadOrEmpty(lockFile, project: config.projectId);
+    // Inert seed: the diff ignores it and `_writeLock` writes the resolved id.
+    // Keeping this offline (pre-resolve) lets a no-op push skip the credential.
+    final lock = Lockfile.loadOrEmpty(lockFile, project: config.ref.lockSeed);
     final diff = lock.diff(extraction.units);
     reportExtraction(_logger, extraction, diff);
 
-    if (extraction.units.isEmpty) {
+    if (extraction.units.isEmpty && !publish) {
       _logger.info('No extractable tr() strings found. Nothing to push.');
       return 0;
     }
@@ -160,14 +194,19 @@ class PushCommand extends Command<int> {
     ];
 
     try {
+      final projectId = await resolveProjectId(config, client, logger: _logger);
+      // Nothing to register: publish the state that's already on the server
+      // (and never touch the lockfile - `--prune` would empty it).
+      if (units.isEmpty) {
+        _logger.info(
+          'No extractable tr() strings found - publishing the current state.',
+        );
+        await _publish(client, projectId, approvedOnly);
+        return 0;
+      }
+
       // ---- 3. cost preview (dry run, batched) ----
-      final preview = await _run(
-        client,
-        config.projectId,
-        units,
-        langs,
-        dryRun: true,
-      );
+      final preview = await _run(client, projectId, units, langs, dryRun: true);
       _logger.info(
         '${preview.unitsNeedingTranslation} string(s) need translation · '
         '~${preview.estimatedCredits} credit(s) (balance ${preview.balance}).',
@@ -200,9 +239,23 @@ class PushCommand extends Command<int> {
         return preview.affordable ? 0 : 1;
       }
 
+      // A zero estimate means nothing NEW needs a fill - but langs left
+      // in-flight by an earlier push are free and still untranslated, so
+      // publishing here without waiting would bake base text (friction F2).
       if (preview.estimatedCredits == 0) {
-        _logger.info('Everything is already translated.');
-        _writeLock(lockFile, config.projectId, lock, extraction, prune);
+        _logger.info(
+          preview.unitsNeedingTranslation == 0
+              ? 'Everything is already translated.'
+              : '${preview.unitsNeedingTranslation} string(s) are still being '
+                    'translated from an earlier push.',
+        );
+        _writeLock(lockFile, projectId, lock, extraction, prune);
+        if (publish) {
+          await _waitForFill(client, projectId, units, langs);
+          await _publish(client, projectId, approvedOnly);
+        } else if (preview.unitsNeedingTranslation > 0) {
+          _logger.info("Run 'easyi18n pull' once it completes.");
+        }
         return 0;
       }
 
@@ -226,26 +279,103 @@ class PushCommand extends Command<int> {
       // ---- 5. real push, batched ----
       final pushed = await _run(
         client,
-        config.projectId,
+        projectId,
         units,
         langs,
         dryRun: false,
         maxCredits: maxCredits,
       );
-      _writeLock(lockFile, config.projectId, lock, extraction, prune);
+      _writeLock(lockFile, projectId, lock, extraction, prune);
 
       if (pushed.trackingTokens.isEmpty) {
         _logger.info('Registered. Nothing new to translate.');
       } else {
         _logger.info(
           'Pushed. Translating in the background '
-          '(${pushed.trackingTokens.length} job(s)). '
-          "Run 'easyi18n pull' once it completes.",
+          '(${pushed.trackingTokens.length} job(s)).'
+          '${publish ? '' : " Run 'easyi18n pull' once it completes."}',
         );
+      }
+      if (publish) {
+        await _waitForFill(client, projectId, units, langs);
+        await _publish(client, projectId, approvedOnly);
       }
       return 0;
     } finally {
       client.close();
+    }
+  }
+
+  /// Polls the dry-run estimate until nothing needs translation - friction F2:
+  /// publishing before the fill lands would bake base-language text into the
+  /// target locales. Polls first, so a completed (or never-started) fill costs
+  /// no wait at all.
+  ///
+  /// A poll that would COST credits is the terminal signal: an in-flight fill
+  /// is free to re-estimate, so a priced lang is one that failed (or was never
+  /// queued) and no amount of waiting will land it.
+  Future<void> _waitForFill(
+    TranslationsApiClient client,
+    String projectId,
+    List<TranslateUnit> units,
+    List<String> langs,
+  ) async {
+    final deadline = DateTime.now().add(_publishPollTimeout);
+    var announced = false;
+    while (true) {
+      final poll = await _run(client, projectId, units, langs, dryRun: true);
+      if (poll.unitsNeedingTranslation == 0) {
+        if (announced) _logger.info('Fill complete.');
+        return;
+      }
+      if (poll.estimatedCredits > 0) {
+        throw CliException(
+          '${poll.unitsNeedingTranslation} string(s) did not translate - the '
+          'fill failed, or your credits ran out. Nothing was published; '
+          "re-run 'easyi18n push --publish' to retry them.",
+        );
+      }
+      if (DateTime.now().isAfter(deadline)) {
+        throw CliException(
+          'The fill did not complete within '
+          '${_publishPollTimeout.inMinutes} minutes '
+          '(${poll.unitsNeedingTranslation} string(s) still pending). '
+          "Nothing is lost - re-run 'easyi18n push --publish' later, or "
+          'publish from the dashboard.',
+        );
+      }
+      if (!announced) {
+        _logger.info('Waiting for the AI fill to complete...');
+        announced = true;
+      }
+      _logger.detail('${poll.unitsNeedingTranslation} string(s) pending...');
+      await _wait(_publishPollInterval);
+    }
+  }
+
+  Future<void> _publish(
+    TranslationsApiClient client,
+    String projectId,
+    bool approvedOnly,
+  ) async {
+    final outcome = await client.publish(
+      projectId: projectId,
+      approvedOnly: approvedOnly,
+    );
+    _logger.info(
+      'Published ${outcome.versionId} (${outcome.keyCount} key(s)). '
+      'Live via delivery within one poll interval.',
+    );
+    // The ICU gate refused these cells — they shipped the incomplete-mode
+    // fallback instead. Warn (not fail): the publish itself succeeded.
+    if (outcome.icuRejected.isNotEmpty) {
+      _logger.warn(
+        '${outcome.icuRejected.length} translation(s) failed ICU validation '
+        'and fell back to the incomplete mode:',
+      );
+      for (final entry in outcome.icuRejected) {
+        _logger.warn('  $entry');
+      }
     }
   }
 

@@ -14,15 +14,27 @@ import 'package:http/http.dart' as http;
 /// a debounced batch. Best-effort - a failed POST is swallowed.
 class CaptureReporter {
   CaptureReporter({
-    required this.endpoint,
+    Uri? endpoint,
     required this.token,
     required http.Client client,
     this.flushInterval = const Duration(seconds: 3),
     this.maxBatch = 200,
-  }) : _client = client;
+  })  : _client = client,
+        _endpoint = endpoint;
 
-  /// `…/v1/projects/{id}/capture`.
-  final Uri endpoint;
+  /// `…/v1/projects/{id}/capture`. Deferred (null) when the scope was addressed
+  /// by `@handle/slug`: capture is id-only, and the id isn't known until the
+  /// first manifest — [setEndpoint] fills it in then. Misses recorded before it
+  /// resolves stay buffered in [_pending] (never dropped).
+  Uri? _endpoint;
+
+  /// Provide the capture endpoint once the project id is known (from the first
+  /// manifest). First call wins; drains anything buffered meanwhile.
+  void setEndpoint(Uri endpoint) {
+    if (_disposed || _endpoint != null) return;
+    _endpoint = endpoint;
+    if (_pending.isNotEmpty) unawaited(flush());
+  }
 
   /// A `capture`-scope dev token (`Authorization: Bearer …`). Debug-only.
   final String token;
@@ -50,9 +62,20 @@ class CaptureReporter {
 
   /// Send the pending batch now (best-effort).
   Future<void> flush() async {
+    if (_pending.isEmpty) {
+      _timer?.cancel();
+      _timer = null;
+      return;
+    }
+    final endpoint = _endpoint;
+    if (endpoint == null) {
+      // Endpoint not known yet (deferred until the first manifest). Keep the
+      // buffer and re-arm so a later tick — or setEndpoint — drains it.
+      if (!_disposed) _timer ??= Timer(flushInterval, () => unawaited(flush()));
+      return;
+    }
     _timer?.cancel();
     _timer = null;
-    if (_pending.isEmpty) return;
     final batch = List.of(_pending);
     _pending.clear();
     try {

@@ -1,9 +1,11 @@
 import 'package:args/command_runner.dart';
 
+import 'commands/doctor_command.dart';
 import 'commands/extract_command.dart';
 import 'commands/init_command.dart';
 import 'commands/pull_command.dart';
 import 'commands/push_command.dart';
+import 'commands/rollback_command.dart';
 import 'commands/status_command.dart';
 import 'logger.dart';
 
@@ -23,9 +25,11 @@ class Easyi18nCommandRunner extends CommandRunner<int> {
       defaultsTo: 'easyi18n.yaml',
     );
     addCommand(InitCommand(logger: log));
+    addCommand(DoctorCommand(logger: log));
     addCommand(PullCommand(logger: log));
     addCommand(ExtractCommand(logger: log));
     addCommand(PushCommand(logger: log));
+    addCommand(RollbackCommand(logger: log));
     addCommand(StatusCommand(logger: log));
   }
 }

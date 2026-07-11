@@ -65,7 +65,12 @@ flutter gen-l10n
 ```
 
 `pull` downloads every locale's file for the configured format and writes them
-into `output/`, ready for `gen-l10n`.
+into `output/`, ready for `gen-l10n`. It records what it writes (in
+`.easyi18n/state.json` — add `.easyi18n/` to your VCS ignore) and, on the next
+full pull of the same format and output dir, removes files the server no
+longer serves (e.g. a locale renamed to its canonical filename). A `--lang`
+pull never removes anything; switching `format:` or `output:` never prunes
+either — the stranded files of the old target are listed instead.
 
 | Flag | Description |
 |------|-------------|
@@ -111,6 +116,8 @@ Translate 3 string(s) for ~30 credit(s)? [y/N]
 | `--lang` | Restrict to these target languages (repeatable). |
 | `--source-dir` | Directory to scan, relative to the config (default `lib`). |
 | `--token` | Credential (overrides `EASYI18N_TOKEN`). |
+| `--publish` | Wait for the fill to complete, then publish a new version (needs the `publish` scope). |
+| `--approved-only` | With `--publish`: treat unapproved translations as missing. |
 
 A `tr(variable)` or an interpolated `tr('Hi $name')` can't be read statically;
 the CLI reports it so you know it relies on runtime auto-capture instead.
@@ -131,6 +138,40 @@ dart run easyi18n_cli:easyi18n extract
 `extract` runs the same scan but stays **offline and read-only**: it prints what
 would be registered, what's new, what's orphaned, and which calls are dynamic.
 Use `--fail-on-orphans` as a CI drift check.
+
+### `rollback`: undo a bad publish
+
+```sh
+dart run easyi18n_cli:easyi18n rollback            # restore the previous version
+dart run easyi18n_cli:easyi18n rollback 2026.07.08.2
+```
+
+Restores a prior published version as a **new** version (history is never
+rewritten) and points delivery at it. Needs the `publish` scope.
+
+## Doctor: check the whole integration
+
+```sh
+dart run easyi18n_cli:easyi18n doctor
+```
+
+`doctor` is read-only and never spends credits. It checks:
+
+- **Local wiring** — `easyi18n.yaml`, the `easyi18n` dependency, the
+  `assets/easyi18n/` offline floor, `com.apple.security.network.client` in
+  BOTH macOS `.entitlements` (without it, delivery fetches fail *silently* in
+  the sandbox), and that `Easyi18nScope` is mounted.
+- **ICU health** — lints every extracted `tr()` string (unbalanced braces,
+  `plural`/`select` without `other`, …). A malformed ICU string renders raw
+  to your users.
+- **Delivery** — actively fetches the public manifest (the runtime swallows
+  delivery errors by design, so doctor must not): reachable, CORS served for
+  web, and then grades your `tr()` scan against the published bundles —
+  **missing** (never pushed/published), **untranslated** per locale, and
+  **unused** published keys.
+
+Exit code 1 on blocking problems; warnings (e.g. strings pending a push)
+don't block. Most local failures are fixed by re-running `easyi18n init`.
 
 ## CI
 

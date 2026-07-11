@@ -27,6 +27,7 @@ class TrExtractor {
     final base = relativeTo ?? dir.path;
     final units = <String, ExtractedUnit>{};
     final dynamics = <DynamicUnit>[];
+    String? scopeFile;
     var filesScanned = 0;
 
     for (final file in _dartFiles(dir)) {
@@ -55,6 +56,7 @@ class TrExtractor {
         units.putIfAbsent(u.identity, () => u);
       }
       dynamics.addAll(visitor.dynamics);
+      if (visitor.sawScope) scopeFile ??= rel;
     }
 
     final sorted = units.values.toList()
@@ -63,6 +65,7 @@ class TrExtractor {
       units: sorted,
       dynamics: dynamics,
       filesScanned: filesScanned,
+      scopeFile: scopeFile,
     );
   }
 
@@ -87,10 +90,27 @@ class _TrVisitor extends RecursiveAstVisitor<void> {
   final units = <ExtractedUnit>[];
   final dynamics = <DynamicUnit>[];
 
+  /// Whether this file constructs an `Easyi18nScope(...)` (the SDK wiring
+  /// `doctor` verifies). AST-level, so comments/strings don't count.
+  var sawScope = false;
+
   @override
   void visitMethodInvocation(MethodInvocation node) {
     if (node.methodName.name == 'tr') _handle(node);
+    // Without resolution, a plain `Easyi18nScope(...)` parses as a method
+    // invocation; `const`/`new` forms are InstanceCreationExpressions below.
+    if (node.methodName.name == 'Easyi18nScope' && node.target == null) {
+      sawScope = true;
+    }
     super.visitMethodInvocation(node);
+  }
+
+  @override
+  void visitInstanceCreationExpression(InstanceCreationExpression node) {
+    if (node.constructorName.type.name.lexeme == 'Easyi18nScope') {
+      sawScope = true;
+    }
+    super.visitInstanceCreationExpression(node);
   }
 
   void _handle(MethodInvocation node) {
@@ -135,19 +155,31 @@ class _TrVisitor extends RecursiveAstVisitor<void> {
       );
       return;
     }
-    units.add(
-      ExtractedUnit(source: value, ctx: _ctxArg(node), file: _file, line: line),
-    );
+    final (ctx, ctxIsStatic) = _ctxArg(node);
+    if (!ctxIsStatic) {
+      // A non-literal ctx changes the messageToken; registering the no-ctx
+      // unit would be the WRONG string. Only auto-capture sees the real one.
+      dynamics.add(
+        DynamicUnit(file: _file, line: line, snippet: _snippet(node)),
+      );
+      return;
+    }
+    units.add(ExtractedUnit(source: value, ctx: ctx, file: _file, line: line));
   }
 
-  String? _ctxArg(MethodInvocation node) {
+  /// The `ctx:` argument value, plus whether it is statically known (absent
+  /// and an explicit `ctx: null` both count as known-null — they produce the
+  /// same runtime token; a non-literal expression does not).
+  (String?, bool) _ctxArg(MethodInvocation node) {
     for (final a in node.argumentList.arguments) {
       if (a is NamedArgument && a.name.lexeme == 'ctx') {
         final v = a.argumentExpression;
-        if (v is StringLiteral) return v.stringValue;
+        if (v is NullLiteral) return (null, true);
+        final literal = v is StringLiteral ? v.stringValue : null;
+        return (literal, literal != null);
       }
     }
-    return null;
+    return (null, true);
   }
 
   String _snippet(AstNode node) {

@@ -40,7 +40,10 @@ void reportExtraction(CliLogger log, ExtractionResult ex, LockfileDiff diff) {
 }
 
 String _fmt(String source, String? ctx) {
-  final shown = source.length > 60 ? '${source.substring(0, 57)}...' : source;
   final suffix = (ctx != null && ctx.isNotEmpty) ? '  (ctx: $ctx)' : '';
-  return '"$shown"$suffix';
+  return '"${ellipsize(source)}"$suffix';
 }
+
+/// One-line display form of a source string (shared by the scan reports).
+String ellipsize(String s, {int max = 60}) =>
+    s.length > max ? '${s.substring(0, max - 3)}...' : s;

@@ -27,11 +27,17 @@ class Easyi18nController extends ChangeNotifier {
     required DeliveryService delivery,
     BakedLoader? bakedLoader,
     CaptureReporter? capture,
+    Uri Function(String projectId)? captureEndpointBuilder,
     MessageResolver resolver = const MessageResolver(),
   })  : _delivery = delivery,
         _bakedLoader = bakedLoader,
         _capture = capture,
-        _resolver = resolver;
+        _captureEndpointBuilder = captureEndpointBuilder,
+        _resolver = resolver {
+    // The declared locales seed the offerable set; the manifest grows it (§Fase
+    // 1: languages from the manifest).
+    _available.addAll(supportedLocales);
+  }
 
   /// Wire a production controller against a delivery origin (CDN or backend).
   /// [baseUrl] is the API origin; the manifest is fetched from
@@ -64,11 +70,35 @@ class Easyi18nController extends ChangeNotifier {
   final DeliveryService _delivery;
   final BakedLoader? _bakedLoader;
   final CaptureReporter? _capture;
+
+  /// Builds the id-only capture endpoint once the manifest reveals the project
+  /// id (F1 B4 — the delivery ref may be a `@handle/slug` pair with no id). Null
+  /// when the scope built the reporter with an eager endpoint (id ref).
+  final Uri Function(String projectId)? _captureEndpointBuilder;
   final MessageResolver _resolver;
+
+  /// Feed the manifest's project id to the deferred capture reporter (no-op once
+  /// its endpoint is set, or when there's nothing to defer).
+  void _learnProject(String? projectId) {
+    final build = _captureEndpointBuilder;
+    if (projectId != null && build != null) {
+      _capture?.setEndpoint(build(projectId));
+    }
+  }
 
   final Map<String, BundleStack> _stacks = {};
   final Set<String> _loading = {};
   bool _disposed = false;
+
+  /// Locales the app can switch to: the declared [supportedLocales] plus any the
+  /// manifest advertises. A [LocaleCubit] reads this (via the scope's notifier)
+  /// to build a language menu from what the project actually publishes, instead
+  /// of a hardcoded list. Insertion order = declared first, then discovered.
+  final Set<String> _available = {};
+
+  /// The locales the app may present, declared + manifest-discovered. Updates
+  /// (and notifies) as a refresh learns new published languages.
+  List<String> get availableLocales => List.unmodifiable(_available);
 
   /// Resolve `tr(source)` for [locale]. Pure + synchronous; schedules a load if
   /// the locale's bundles aren't in memory yet (raw source serves meanwhile).
@@ -94,12 +124,14 @@ class Easyi18nController extends ChangeNotifier {
         onMiss: onMiss);
   }
 
-  /// Best supported bundle code for a requested locale tag: exact match, else a
-  /// language-only match, else the base (first) supported locale.
+  /// Best offerable bundle code for a requested locale tag: exact match, else a
+  /// language-only match, else the base (first declared) locale. Matches against
+  /// the live [_available] set so a manifest-discovered locale resolves to
+  /// itself instead of collapsing to the base.
   String matchLocale(String requested) {
-    if (supportedLocales.contains(requested)) return requested;
+    if (_available.contains(requested)) return requested;
     final lang = _lang(requested);
-    for (final l in supportedLocales) {
+    for (final l in _available) {
       if (_lang(l) == lang) return l;
     }
     return supportedLocales.isNotEmpty ? supportedLocales.first : requested;
@@ -115,14 +147,30 @@ class Easyi18nController extends ChangeNotifier {
     await refresh();
   }
 
-  /// Re-check the manifest and hot-swap any changed bundles.
+  /// Re-check the manifest and hot-swap any changed bundles. Public so a live
+  /// trigger (on-resume / poll interval, wired by [Easyi18nScope]) can pull a
+  /// freshly-published version into a running app with no rebuild. Refreshes
+  /// every locale currently loaded (not just the declared ones), so whichever
+  /// language the user is viewing gets the update. Idempotent + serialized by
+  /// the delivery lock, so concurrent triggers are safe.
   Future<void> refresh() async {
+    final locales = <String>{...supportedLocales, ..._stacks.keys};
     try {
-      final changed = await _delivery.refresh(supportedLocales);
-      if (changed.isNotEmpty) _applyHot(changed);
+      final result = await _delivery.refresh(locales);
+      _learnProject(result.project);
+      if (result.changed.isNotEmpty) _applyHot(result.changed);
+      _mergeAvailable(result.locales);
     } on DeliveryException {
       // Best-effort: the floor still serves.
     }
+  }
+
+  /// Fold manifest-discovered locales into [_available]; notify if it grew so a
+  /// language menu bound to the notifier rebuilds.
+  void _mergeAvailable(Set<String> locales) {
+    final before = _available.length;
+    _available.addAll(locales);
+    if (_available.length != before) _notify();
   }
 
   Future<void> _loadBaked(Iterable<String> locales) async {
@@ -165,8 +213,10 @@ class Easyi18nController extends ChangeNotifier {
       await _loadBaked([code]);
       await _loadPersisted([code]);
       try {
-        final changed = await _delivery.refresh([code]);
-        if (changed.isNotEmpty) _applyHot(changed);
+        final result = await _delivery.refresh([code]);
+        _learnProject(result.project);
+        if (result.changed.isNotEmpty) _applyHot(result.changed);
+        _mergeAvailable(result.locales);
       } on DeliveryException {
         // floor serves
       }

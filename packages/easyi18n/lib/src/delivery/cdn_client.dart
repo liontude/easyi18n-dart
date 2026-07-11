@@ -78,6 +78,15 @@ class CdnClient {
 
   /// Conditional GET of the manifest. Sends `If-None-Match: <etag>` when known
   /// so an unchanged manifest costs a cheap 304.
+  ///
+  /// Web caveat: freshness is driven by the **origin's** `cache-control` on the
+  /// manifest response (it ships `no-cache`, so the browser revalidates on every
+  /// poll and a publish reaches an open app within one interval). We do NOT set
+  /// a request `cache-control` header: on web that is not a CORS-safelisted
+  /// header, so it would trigger a preflight the delivery origin doesn't allow
+  /// and the fetch would fail. `if-none-match` is only readable/effective off
+  /// the web (the origin doesn't expose `etag` cross-origin), where it stays a
+  /// cheap 304; on web the browser does its own revalidation.
   Future<ManifestFetch> fetchManifest(Uri url, {String? etag}) async {
     final http.Response res;
     try {

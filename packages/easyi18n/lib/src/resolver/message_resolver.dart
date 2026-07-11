@@ -25,7 +25,7 @@ class MessageResolver {
     required BundleStack stack,
     void Function()? onMiss,
   }) {
-    final token = messageTokenForValue(TranslationText(source), ctx: ctx);
+    final token = _tokenFor(source, ctx);
     for (final bundle in stack.layers) {
       final slug = bundle.tokenIndex[token];
       if (slug == null) continue;
@@ -51,4 +51,24 @@ class MessageResolver {
       return pattern;
     }
   }
+}
+
+/// `resolve()` runs on every widget rebuild and the (source, ctx) → token hash
+/// is pure, so memoize it behind a bounded cache instead of re-hashing each
+/// frame. Cleared wholesale when it grows past the cap (call sites are a small,
+/// stable set in practice, so a plain map amortizes to hits).
+final Map<String, String> _tokenCache = {};
+const int _tokenCacheMax = 4096;
+
+String _tokenFor(String source, String? ctx) {
+  // Length-prefixed ctx keeps the key unambiguous (ctx can always be split back
+  // out), so two different (source, ctx) pairs can't collide; `-1` marks a null
+  // ctx distinctly from an empty one.
+  final key = '${ctx?.length ?? -1}:${ctx ?? ''}$source';
+  final hit = _tokenCache[key];
+  if (hit != null) return hit;
+  final token = messageTokenForValue(TranslationText(source), ctx: ctx);
+  if (_tokenCache.length >= _tokenCacheMax) _tokenCache.clear();
+  _tokenCache[key] = token;
+  return token;
 }

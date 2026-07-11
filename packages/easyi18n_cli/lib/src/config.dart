@@ -3,13 +3,14 @@ import 'dart:io';
 import 'package:yaml/yaml.dart';
 
 import 'exceptions.dart';
+import 'project_ref.dart';
 
 /// Project config read from `easyi18n.yaml` at the repo root. Holds everything
 /// `pull` needs except the credential - the token is never persisted to disk
 /// (it comes from `EASYI18N_TOKEN` or `--token`).
 class Easyi18nConfig {
   Easyi18nConfig({
-    required this.projectId,
+    required this.ref,
     String? baseUrl,
     String? format,
     String? output,
@@ -17,8 +18,9 @@ class Easyi18nConfig {
        format = format ?? defaultFormat,
        output = output ?? defaultOutput;
 
-  /// The project to pull translations for. Required.
-  final String projectId;
+  /// The project ref. [ProjectRef.parse] is the single validator — the sealed
+  /// type guarantees exactly one form, so nothing downstream re-checks.
+  final ProjectRef ref;
 
   /// Backend origin. Defaults to production; override for the local emulator.
   final String baseUrl;
@@ -34,6 +36,9 @@ class Easyi18nConfig {
   static const String defaultBaseUrl = 'https://api.easyi18n.com';
   static const String defaultFormat = 'arb';
   static const String defaultOutput = 'lib/l10n';
+
+  /// A human-readable label for the configured ref, for diagnostics/logs.
+  String get describeRef => ref.describe;
 
   /// Loads and validates the config from [file], throwing [CliException] with
   /// an actionable message on any problem.
@@ -55,13 +60,13 @@ class Easyi18nConfig {
       throw CliException('${file.path} must be a YAML map of settings.');
     }
 
-    final projectId = _readString(parsed, 'projectId')?.trim();
-    if (projectId == null || projectId.isEmpty) {
-      throw CliException("${file.path} is missing required 'projectId'.");
-    }
-
     return Easyi18nConfig(
-      projectId: projectId,
+      ref: ProjectRef.parse(
+        projectId: _readString(parsed, 'projectId')?.trim(),
+        workspace: _readString(parsed, 'workspace')?.trim(),
+        project: _readString(parsed, 'project')?.trim(),
+        source: file.path,
+      ),
       baseUrl: _readString(parsed, 'baseUrl')?.trim(),
       format: _readString(parsed, 'format')?.trim(),
       output: _readString(parsed, 'output')?.trim(),
@@ -70,13 +75,19 @@ class Easyi18nConfig {
 
   /// Serializes to YAML with explanatory comments. Deliberately hand-written
   /// (no token, stable key order) so generated configs stay reviewable.
-  String toYaml() =>
-      '''
+  String toYaml() {
+    final refLines = switch (ref) {
+      IdRef(:final id) => 'projectId: $id',
+      HandleRef(:final workspace, :final slug) =>
+        'workspace: $workspace\nproject: $slug',
+    };
+    return '''
 # easyi18n CLI config (Mode A, native .arb).
 # Docs: https://github.com/liontude/easyi18n-dart
 
-# The project to pull translations for.
-projectId: $projectId
+# The project to pull translations for: the @handle/slug pair from your
+# dashboard URL (workspace + project), or an opaque projectId.
+$refLines
 
 # Backend origin. Override with http://localhost:8080 for the local emulator.
 baseUrl: $baseUrl
@@ -87,6 +98,7 @@ format: $format
 # Where the rendered files are written (your l10n.yaml arb-dir for Mode A).
 output: $output
 ''';
+  }
 
   static String? _readString(Map map, String key) {
     final value = map[key];

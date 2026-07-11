@@ -36,6 +36,7 @@ class ExtractionResult {
     required this.units,
     required this.dynamics,
     required this.filesScanned,
+    this.scopeFile,
   });
 
   /// Extractable units, deduped by (source, ctx) and sorted for stable output.
@@ -45,4 +46,9 @@ class ExtractionResult {
   final List<DynamicUnit> dynamics;
 
   final int filesScanned;
+
+  /// First file (relative path) where an `Easyi18nScope(...)` is constructed —
+  /// AST-level, so a mention in a comment or string doesn't count. Null when
+  /// the scope is not mounted in the scanned tree.
+  final String? scopeFile;
 }

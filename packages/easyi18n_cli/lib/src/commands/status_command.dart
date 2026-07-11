@@ -6,6 +6,7 @@ import '../api_client.dart';
 import '../config.dart';
 import '../exceptions.dart';
 import '../logger.dart';
+import '../resolve.dart';
 import '../security.dart';
 import '../state.dart';
 import 'pull_command.dart' show ApiClientFactory;
@@ -62,7 +63,8 @@ class StatusCommand extends Command<int> {
     final client = _apiClientFactory(baseUrl: config.baseUrl, token: token);
     final ProjectMeta meta;
     try {
-      meta = await client.fetchMeta(projectId: config.projectId);
+      final projectId = await resolveProjectId(config, client, logger: _logger);
+      meta = await client.fetchMeta(projectId: projectId);
     } finally {
       client.close();
     }

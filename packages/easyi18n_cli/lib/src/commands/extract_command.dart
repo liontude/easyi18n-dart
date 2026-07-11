@@ -56,7 +56,8 @@ class ExtractCommand extends Command<int> {
 
     final lock = Lockfile.loadOrEmpty(
       File(p.join(root, Lockfile.fileName)),
-      project: config.projectId,
+      // Inert seed: extract only diffs the lockfile, never writes it.
+      project: config.ref.lockSeed,
     );
     final diff = lock.diff(extraction.units);
     reportExtraction(_logger, extraction, diff);

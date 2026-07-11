@@ -11,6 +11,16 @@ Uri buildManifestUrl(Uri baseUrl, String projectId, String channel) {
   return Uri.parse('$base/v1/projects/$projectId/manifest?channel=$channel');
 }
 
+/// The manifest endpoint addressed by the human-readable pair:
+/// `{baseUrl}/v1/@{handle}/{slug}/manifest?channel={channel}` (F1). Same payload
+/// as [buildManifestUrl]; the bundle URLs it advertises point back at the
+/// canonical `/v1/projects/{id}/...` path, so bundles stay on the cached origin.
+Uri buildManifestUrlByHandle(
+    Uri baseUrl, String handle, String slug, String channel) {
+  final base = baseUrl.toString().replaceFirst(RegExp(r'/+$'), '');
+  return Uri.parse('$base/v1/@$handle/$slug/manifest?channel=$channel');
+}
+
 /// The auto-capture endpoint for a project:
 /// `{baseUrl}/v1/projects/{projectId}/capture`.
 Uri buildCaptureUrl(Uri baseUrl, String projectId) {
@@ -56,9 +66,12 @@ class DeliveryService {
   Future<void> _refreshLock = Future<void>.value();
 
   /// Conditional manifest check → download the changed bundles for [locales],
-  /// persist them + the new state, and return ONLY the bundles that changed
-  /// (the caller swaps those into the hot layer). Empty map = nothing to do.
-  Future<Map<String, Bundle>> refresh(Iterable<String> locales) {
+  /// persist them + the new state, and return the bundles that changed (the
+  /// caller swaps those into the hot layer) alongside the full set of locales
+  /// the manifest advertises (for language discovery). `changed` empty =
+  /// nothing to swap; `locales` is still populated so the caller learns which
+  /// languages the project publishes even on a 304.
+  Future<RefreshResult> refresh(Iterable<String> locales) {
     final list = locales.toList(growable: false);
     final result = _refreshLock.then((_) => _refresh(list));
     // Chain the lock so the next refresh waits for this one; swallow errors so
@@ -67,7 +80,7 @@ class DeliveryService {
     return result;
   }
 
-  Future<Map<String, Bundle>> _refresh(List<String> locales) async {
+  Future<RefreshResult> _refresh(List<String> locales) async {
     final state = await store.loadState(channel);
     // Conditional fetch (cheap 304 when unchanged). If the manifest is
     // unchanged but a requested locale still has no persisted bundle (e.g. a
@@ -80,11 +93,20 @@ class DeliveryService {
     );
     if (fetch is ManifestNotModified) {
       final missing = locales.any((l) => !state.hashByLocale.containsKey(l));
-      if (!missing) return const {};
+      // Unchanged: nothing to download, but the locales we already know the
+      // project publishes are the persisted hash pointers.
+      if (!missing) {
+        return RefreshResult(
+            changed: const {}, locales: state.hashByLocale.keys.toSet());
+      }
       fetch = await client.fetchManifest(manifestUrl, etag: null);
     }
-    if (fetch is! ManifestUpdated) return const {};
+    if (fetch is! ManifestUpdated) {
+      return RefreshResult(
+          changed: const {}, locales: state.hashByLocale.keys.toSet());
+    }
     final manifest = fetch.manifest;
+    final project = manifest.project;
 
     final changed = <String, Bundle>{};
     final hashes = Map<String, String>.from(state.hashByLocale);
@@ -112,6 +134,35 @@ class DeliveryService {
       channel,
       state.copyWith(manifestEtag: fetch.etag, hashByLocale: hashes),
     );
-    return changed;
+    // Every locale the manifest lists is offerable, even if we didn't fetch its
+    // bundle this pass (only [locales] were requested for download).
+    return RefreshResult(
+        changed: changed,
+        locales: manifest.locales.keys.toSet(),
+        project: project);
   }
+}
+
+/// The outcome of a [DeliveryService.refresh]: the bundles that changed (to swap
+/// into the hot layer) and the full set of locales the manifest advertises (so
+/// the runtime can discover languages it wasn't told about up front).
+class RefreshResult {
+  const RefreshResult({
+    required this.changed,
+    required this.locales,
+    this.project,
+  });
+
+  /// Locales whose bundle content changed this refresh (empty = nothing to do).
+  final Map<String, Bundle> changed;
+
+  /// Every locale the project currently publishes, from the manifest (or the
+  /// last-known persisted pointers on a 304).
+  final Set<String> locales;
+
+  /// The project's opaque doc-id, from the manifest — the delivery ref may be a
+  /// `@handle/slug` pair, so this is how the runtime learns the id (to build the
+  /// id-only capture endpoint, F1 B4). Null when the manifest wasn't refetched
+  /// (a 304 or a failed fetch).
+  final String? project;
 }

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:easyi18n/src/contract/i18n/text_hash.dart';
 import 'package:easyi18n/src/contract/models/bundle.dart';
+import 'package:easyi18n/src/contract/models/manifest.dart';
 import 'package:easyi18n/src/contract/models/translation_value.dart';
 import 'package:easyi18n/src/delivery/bundle_store.dart';
 import 'package:easyi18n/src/delivery/capture_reporter.dart';
@@ -44,6 +45,27 @@ void main() {
       expect(units.map((u) => u['source']), containsAll(['Alpha', 'Open']));
       final open = units.firstWhere((u) => u['source'] == 'Open');
       expect(open['ctx'], 'verb');
+    });
+
+    test('deferred endpoint buffers misses until set, then posts (F1 B4)',
+        () async {
+      Uri? postedTo;
+      final reporter = CaptureReporter(
+        endpoint: null, // handle/slug ref → id unknown yet
+        token: 'eik_dev',
+        client: MockClient((req) async {
+          postedTo = req.url;
+          return http.Response('{}', 200);
+        }),
+        flushInterval: const Duration(hours: 1),
+      );
+      reporter.record('Early miss', null);
+      await reporter.flush(); // no endpoint → buffered, nothing posted
+      expect(postedTo, isNull);
+
+      reporter.setEndpoint(Uri.parse('https://x/v1/projects/p123/capture'));
+      await pumpEventQueue(); // let setEndpoint's drain flush complete
+      expect(postedTo, Uri.parse('https://x/v1/projects/p123/capture'));
     });
 
     test('a swallowed POST error does not throw', () async {
@@ -130,6 +152,42 @@ void main() {
       final units = (jsonDecode(captureBody!) as Map)['units'] as List;
       expect(units.map((u) => (u as Map)['source']), contains('Fresh source'));
 
+      controller.dispose();
+    });
+
+    test('a handle/slug controller learns the id from the manifest and '
+        'captures to the id endpoint (F1 B4)', () async {
+      Uri? postedTo;
+      final reporter = CaptureReporter(
+        endpoint: null, // deferred: the ref is @handle/slug, no id yet
+        token: 'eik_dev',
+        client: MockClient((req) async {
+          postedTo = req.url;
+          return http.Response('{}', 200);
+        }),
+        flushInterval: const Duration(hours: 1),
+      );
+      final manifest = Manifest(
+          project: 'p123', revision: 'r', locales: const <String, ManifestLocale>{});
+      final controller = Easyi18nController(
+        supportedLocales: const ['es'],
+        capture: reporter,
+        captureEndpointBuilder: (id) =>
+            buildCaptureUrl(Uri.parse('https://x'), id),
+        delivery: DeliveryService(
+          client: CdnClient(MockClient((req) async => http.Response(
+              jsonEncode(manifest.toJson()), 200,
+              headers: {'etag': '"v1"'}))),
+          store: InMemoryBundleStore(),
+          manifestUrl: Uri.parse('https://x/v1/@acme/dogfood/manifest'),
+        ),
+      );
+
+      controller.resolve(source: 'Fresh source', locale: 'es'); // miss buffered
+      await controller.refresh(); // learns p123 → setEndpoint → drains
+      await pumpEventQueue(); // let the drain flush complete
+
+      expect(postedTo, buildCaptureUrl(Uri.parse('https://x'), 'p123'));
       controller.dispose();
     });
   });

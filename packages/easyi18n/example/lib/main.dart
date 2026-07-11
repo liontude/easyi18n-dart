@@ -2,8 +2,17 @@ import 'package:easyi18n/easyi18n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-/// Replace with your easyi18n project id.
-const String kProjectId = 'demo';
+/// Your easyi18n project. Prefer the human-readable `@handle/slug` pair via
+/// `--dart-define=EASYI18N_WORKSPACE=…` + `EASYI18N_PROJECT=…` (the workspace
+/// handle + project slug from the dashboard URL); fall back to the opaque
+/// `EASYI18N_PROJECT_ID` when the workspace isn't set.
+const String kWorkspace = String.fromEnvironment('EASYI18N_WORKSPACE');
+const String kProject = String.fromEnvironment('EASYI18N_PROJECT');
+const String kProjectId = String.fromEnvironment(
+  'EASYI18N_PROJECT_ID',
+  defaultValue: 'demo',
+);
+const bool kUseHandleRef = kWorkspace != '' && kProject != '';
 
 /// `--dart-define=USE_EMULATOR=true` points the SDK at the local backend
 /// delivery origin (`tool/backend-up.sh`); otherwise it uses the default origin.
@@ -22,18 +31,26 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  Locale _locale = const Locale('en');
+  // Start locale: `?locale=es` on web (handy for headless screenshots), else en.
+  Locale _locale = Locale(
+    Uri.base.queryParameters['locale'] == 'es' ? 'es' : 'en',
+  );
 
   @override
   Widget build(BuildContext context) {
-    // Easyi18nScope wraps MaterialApp - the only required argument is the
-    // project id. Baked floors live in assets/easyi18n/{locale}.json; the SDK
-    // hot-updates them from the manifest with no extra code.
+    // Easyi18nScope wraps MaterialApp - identify the project by `@handle/slug`
+    // or the opaque id. Baked floors live in assets/easyi18n/{locale}.json; the
+    // SDK hot-updates them from the manifest with no extra code.
     return Easyi18nScope(
-      projectId: kProjectId,
+      workspace: kUseHandleRef ? kWorkspace : null,
+      slug: kUseHandleRef ? kProject : null,
+      projectId: kUseHandleRef ? null : kProjectId,
       baseUrl: kUseEmulator ? Uri.parse('http://localhost:8080') : null,
       supportedLocales: const ['en', 'es'],
       captureToken: kCaptureToken.isEmpty ? null : kCaptureToken,
+      // Poll for freshly-published versions while running, so a publish hot-swaps
+      // into the open app with no restart (on-resume is on by default too).
+      refreshInterval: const Duration(seconds: 3),
       child: MaterialApp(
         locale: _locale,
         supportedLocales: const [Locale('en'), Locale('es')],

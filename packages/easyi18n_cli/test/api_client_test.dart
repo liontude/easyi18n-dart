@@ -209,4 +209,50 @@ void main() {
       ),
     );
   });
+
+  group('resolveProjectRef', () {
+    test('GETs /projects/resolve with the ref params and bearer', () async {
+      late http.Request captured;
+      final client = clientReturning((req) {
+        captured = req;
+        return http.Response(
+          jsonEncode({'projectId': 'proj_abc', 'workspaceId': 'ws_1'}),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final ref = await client.resolveProjectRef(
+        workspace: 'acme',
+        project: 'dogfood',
+      );
+
+      expect(captured.headers['authorization'], 'Bearer eik_secret');
+      expect(captured.url.path, '/v1/projects/resolve');
+      expect(captured.url.queryParameters['workspace'], 'acme');
+      expect(captured.url.queryParameters['project'], 'dogfood');
+      expect(ref.projectId, 'proj_abc');
+      expect(ref.workspaceId, 'ws_1');
+    });
+
+    test('surfaces a 404 as an actionable CliException', () async {
+      final client = clientReturning(
+        (req) => http.Response(
+          jsonEncode({'error': 'not_found', 'message': 'project not found'}),
+          404,
+        ),
+      );
+
+      expect(
+        () => client.resolveProjectRef(workspace: 'acme', project: 'ghost'),
+        throwsA(
+          isA<CliException>().having(
+            (e) => e.message,
+            'message',
+            contains('easyi18n.yaml'),
+          ),
+        ),
+      );
+    });
+  });
 }

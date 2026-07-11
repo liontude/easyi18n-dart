@@ -50,6 +50,20 @@ void f(BuildContext c, String name) {
     expect(result.dynamics.first.file, 'lib/b.dart');
   });
 
+  test('an explicit ctx: null is the no-ctx unit, not a dynamic', () {
+    // `ctx: null` produces the same runtime token as omitting ctx — demoting
+    // it to dynamics would silently drop the string from registration.
+    write('lib/b.dart', '''
+void f(BuildContext c) {
+  c.tr('Delete', ctx: null);
+}
+''');
+    final result = TrExtractor().extractFromDirectory(tmp);
+    expect(result.dynamics, isEmpty);
+    expect(result.units.single.source, 'Delete');
+    expect(result.units.single.ctx, isNull);
+  });
+
   test('dedups identical (source, ctx) across files, keeps first location', () {
     write('lib/a.dart', "void f(c) => c.tr('Same');\n");
     write('lib/b.dart', "void g(c) => c.tr('Same');\n");
@@ -96,5 +110,40 @@ void f(BuildContext context, dynamic table, List items) {
     write('lib/ok.dart', "void f(c) => c.tr('Ok');\n");
     final result = TrExtractor().extractFromDirectory(tmp);
     expect(result.units.map((u) => u.source), ['Ok']);
+  });
+
+  test('a non-literal ctx is dynamic, not a wrong no-ctx unit', () {
+    write('lib/ctx.dart', '''
+const kVerb = 'verb';
+void f(BuildContext context) {
+  context.tr('Save', ctx: kVerb);
+  context.tr('Open', ctx: 'verb');
+}
+''');
+    final result = TrExtractor().extractFromDirectory(tmp);
+    expect(result.units.map((u) => '${u.source}|${u.ctx}'), ['Open|verb']);
+    expect(result.dynamics, hasLength(1));
+    expect(result.dynamics.single.snippet, contains('Save'));
+  });
+
+  test('detects a mounted Easyi18nScope at the AST level', () {
+    write('lib/main.dart', '''
+// A comment mentioning Easyi18nScope does not count.
+void main() => runApp(const MyApp());
+''');
+    expect(TrExtractor().extractFromDirectory(tmp).scopeFile, isNull);
+
+    write('lib/app.dart', '''
+Widget build() => Easyi18nScope(projectId: 'p', child: const MyApp());
+''');
+    final result = TrExtractor().extractFromDirectory(tmp);
+    expect(result.scopeFile, 'lib/app.dart');
+  });
+
+  test('detects a const/new Easyi18nScope construction', () {
+    write('lib/main.dart', '''
+Widget build() => const Easyi18nScope(projectId: 'p', child: MyApp());
+''');
+    expect(TrExtractor().extractFromDirectory(tmp).scopeFile, 'lib/main.dart');
   });
 }
